@@ -53,11 +53,14 @@ In general we encourage you to update to the most recent version of NIMBLE, 0.12
 
 ## Installing additional packages
 
-<!-- Some of the packages we will use (beyond those automatically installed with `nimble`) can be installed as follows:
+Some of the packages we will use (beyond those automatically installed with `nimble`) can be installed as follows:
 
 ```
-install.packages(c("mcmcplots", "CARBayesdata", "sp", "spdep", "classInt", "coda"))
+install.packages(c("mcmcplots",  "classInt", "coda"))
 ```
+<!--
+"CARBayesdata", "sp", "spdep",
+--->
 
 `compareMCMCs` is a package in development that is not yet on CRAN:
 
@@ -72,4 +75,3 @@ Windows users will probably need to use this invocation:
 library(remotes)
 install_github("nimble-dev/compareMCMCs", subdir = "compareMCMCs", INSTALL_opts = "--no-multiarch")
 ```
- -->
