@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Introduction to NIMBLE</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Introduction to NIMBLE
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
+---
+
+
+
+
+
+
+---
+# What Is NIMBLE?
+
+Numerical Inference for statistical Models using Bayesian and Likelihood Estimation.
+--
+
+- A framework for hierarchical statistical models and methods.
+
+- A nearly drop-in alternative to WinBUGS, OpenBUGS and JAGS.
+
+- An extension of the BUGS language for writing new functions and distributions.
+
+- A configurable system for MCMC.
+
+- A library of other methods.
+    - Sequential Monte Carlo (particle filtering) (via the `nimbleSMC` package)
+    - Monte Carlo Expectation Maximization (maximum likelihood)
+
+- A model-generic programming system to write new analysis methods.
+
+---
+### First example: A generalized linear mixed model (GLMM)
+
+* There are plenty of specialized GLMM packages.
+
+* We start with a GLMM because it will be familiar to many of you.
+
+* This example is from [Zuur et al. (2009, Mixed Effects Models and Extensions in Ecology with R)](https://www.highstat.com/index.php/mixed-effects-models-and-extensions-in-ecology-with-r) (chapter 13).
+
+* Elaphostrongylus cervi (E. cervi) is a nematode parasite of deer.  On each of 24 farms in Spain, multiple deers were sampled for E. cervi.
+
+* Original data from "Vicente et al. (2005)", citing [this](https://doi.org/10.1051/vetres:2005044), although I'm not sure they cited the right paper!
+
+* 826 total deers.
+
+* `Sex` (M/F) and (centered) body `Length` are explanatory variables (fixed effects).
+
+* `Farm` is a random effect.
+
+* Response variable is presence (1) or absence (0) of the parasite E. cervi.
+
+---
+### GLMM example: Load the package
+
+```r
+library(nimble)
+```
+
+### GLMM example: Load data
+
+
+```r
+DeerEcervi &lt;- read.table(file.path('..', 'examples', 
+                                   'DeerEcervi', 'DeerEcervi.txt'), header = TRUE)
+summary(DeerEcervi)
+```
+
+```
+##      Farm                Sex            Length          Ecervi       
+##  Length:826         Min.   :1.000   Min.   : 75.0   Min.   :   0.00  
+##  Class :character   1st Qu.:1.000   1st Qu.:151.0   1st Qu.:   0.00  
+##  Mode  :character   Median :1.000   Median :163.0   Median :   6.60  
+##                     Mean   :1.458   Mean   :161.8   Mean   :  45.42  
+##                     3rd Qu.:2.000   3rd Qu.:174.9   3rd Qu.:  35.79  
+##                     Max.   :2.000   Max.   :216.0   Max.   :2186.60
+```
+
+---
+### GLMM example: Load data
+
+
+```r
+## Create presence/absence data from counts.
+
+DeerEcervi$Ecervi_01 &lt;- DeerEcervi$Ecervi
+DeerEcervi$Ecervi_01[DeerEcervi$Ecervi&gt;0] &lt;- 1
+
+## Set up naming convention for centered and uncentered lengths for exercises later
+DeerEcervi$unctrLength &lt;- DeerEcervi$Length
+
+## Center Length for better interpretation
+DeerEcervi$ctrLength &lt;- DeerEcervi$Length - mean(DeerEcervi$Length)
+
+## Make a factor version of Sex for plotting
+DeerEcervi$fSex &lt;- factor(DeerEcervi$Sex)
+
+## Make a factor and id version of Farm
+DeerEcervi$fFarm &lt;- factor(DeerEcervi$Farm)
+DeerEcervi$farm_ids &lt;- as.numeric(DeerEcervi$fFarm)
+```
+
+---
+### GLMM example: Look at data
+
+
+```r
+ggplot(data = DeerEcervi, 
+        mapping = aes(x = ctrLength, y = Ecervi_01, color = fSex)) +
+  geom_point() + 
+  geom_jitter(width = 0, height = 0.1) + 
+  facet_wrap(~Farm, ncol= 6)
+```
+
+&lt;img src="introduction_to_nimble_files/figure-html/unnamed-chunk-5-1.png" height="50%" /&gt;
+`fSex` is 1 for males, 2 for females.
+
+---
+### GLMM example: Write the model code **in R**
+
+
+```r
+DEcode &lt;- nimbleCode({
+  for(i in 1:2) {
+    # Priors for intercepts and length coefficients for sex = 1 (male), 2 (female)
+    sex_int[i] ~ dnorm(0, sd = 1000)
+    length_coef[i] ~ dnorm(0, sd = 1000)
+  }
+
+  # Priors for farm random effects and their standard deviation.
+  farm_sd ~ dunif(0, 20)  # see Gelman et al. (2006) regarding priors for variance components
+  for(i in 1:num_farms) {
+    farm_effect[i] ~ dnorm(0, sd = farm_sd)
+  }
+
+  # logit link and Bernoulli data probabilities
+  for(i in 1:num_animals) {
+    logit(disease_probability[i]) &lt;-
+      sex_int[ sex[i] ] +
+      length_coef[ sex[i] ]*length[i] +
+      farm_effect[ farm_ids[i] ]
+    Ecervi_01[i] ~ dbern(disease_probability[i])
+  }
+})
+```
+
+---
+### GLMM Example: Steps to use NIMBLE
+
+1. Build the model.  It is an R object.
+
+2. Build the MCMC.
+    - 2a. Configure the MCMC.
+    - 2b. Customize the MCMC.
+    - 2c. Build the MCMC.
+
+3. Compile the model and MCMC.
+
+4. Run the MCMC.
+
+5. Extract the samples.
+
+--
+Comments:
+
+- `nimbleMCMC` does all of this at once.
+- Steps 2a-2c can be combined if no customization is needed.
+- `runMCMC` does steps 4-5
+    - manages burn-in, multiple chains, and extracting samples.
+
+---
+### GLMM Example: 1. Build the model
+
+
+```r
+DEconstants &lt;- list(num_farms = 24,
+                    num_animals = 826,
+                    length = DeerEcervi$ctrLength,
+                    sex = DeerEcervi$Sex,
+                    farm_ids = DeerEcervi$farm_ids)
+
+DEmodel &lt;- nimbleModel(DEcode,
+                       constants = DEconstants)
+```
+
+```
+## Defining model
+```
+
+```
+## Building model
+```
+
+```
+## Running calculate on model
+##   [Note] Any error reports that follow may simply reflect missing values in model variables.
+```
+
+```
+## Checking model sizes and dimensions
+```
+
+```
+##   [Note] This model is not fully initialized. This is not an error.
+##          To see which variables are not initialized, use model$initializeInfo().
+##          For more information on model initialization, see help(modelInitialization).
+```
+
+---
+### GLMM Example: 1b. Set data and inits
+
+These can be provided to `nimbleModel` or now:
+
+```r
+DEmodel$setData(list(Ecervi_01 = DeerEcervi$Ecervi_01))
+# This sets the values and *flags the nodes as data*.
+DEinits &lt;- function() {
+  list(sex_int = c(0, 0),
+       length_coef = c(0, 0),
+       farm_sd = 1,
+       farm_effect = rnorm(24, 0, 1) )
+}
+
+set.seed(123)
+DEmodel$setInits(DEinits())
+```
+
+---
+### GLMM Example: 2. Build the MCMC
+
+
+```r
+DEmcmc &lt;- buildMCMC(DEmodel)
+```
+
+```
+## ===== Monitors =====
+## thin = 1: farm_sd, length_coef, sex_int
+## ===== Samplers =====
+## RW sampler (29)
+##   - sex_int[]  (2 elements)
+##   - length_coef[]  (2 elements)
+##   - farm_sd
+##   - farm_effect[]  (24 elements)
+```
+
+---
+### GLMM Example: 3. Compile the model and MCMC
+
+This can be done in one step or two.  We'll use two.
+
+
+```r
+cDEmodel &lt;- compileNimble(DEmodel) 
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+# First call to compileNimble in a session is slower than later calls.
+cDEmcmc &lt;- compileNimble(DEmcmc, project = DEmodel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+---
+### GLMM Example: 4. Run the MCMC
+
+
+```r
+cDEmcmc$run(10000)
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```
+## NULL
+```
+
+### GLMM Example: 5. Extract the samples
+
+
+```r
+samples1 &lt;- as.matrix(cDEmcmc$mvSamples)
+```
+
+---
+### GLMM Example: Look at results
+
+There are many packages for summarizing and plotting MCMC samples.  NIMBLE does not try to re-invent these wheels.
+
+1. `mcmcplots`
+
+
+```r
+# Run this code if you want to generate your own results.
+# They won't over-write results that come with these slides.
+library(mcmcplots)
+mcmcplot(samples1, dir = ".", filename = "Ecervi_samples_mcmcplot")
+```
+
+
+
+Results that comes with these slides are [here](orig_Ecervi_samples_mcmcplot.html).
+
+Results if you generated your own will be [here](Ecervi_samples_mcmcplot.html).
+
+---
+2. `coda`
+
+
+```r
+# We haven't provided coda figures, but you can make make them if you want.
+library(coda)
+pdf("Ecervi_samples_coda.pdf")
+plot(as.mcmc(samples1))
+dev.off()
+```
+
+Results if you generate the coda pdf will be [here](Ecervi_samples_coda.pdf).
+
+---
+# MCMC workflow in NIMBLE
+
+Here is a summary of the MCMC workflow in NIMBLE.
+
+[workflow.png](workflow.png)
+
+----
+### GLMM Example: Doing it all at once with `nimbleMCMC`
+
+Start from:
+  
+- code
+- constants + data
+- inits
+
+
+```r
+set.seed(123)
+DEdataAndConstants &lt;- c(DEconstants, 
+                        list(Ecervi_01 = DeerEcervi$Ecervi_01))
+samples2 &lt;- nimbleMCMC(DEcode,
+                       constants = DEdataAndConstants,
+                       inits = DEinits,
+                       niter = 10000,
+                       nburnin = 1000,
+                       nchains = 2,
+                       samplesAsCodaMCMC = TRUE)
+```
+
+```
+## Defining model
+```
+
+```
+##   [Note] Using 'Ecervi_01' (given within 'constants') as data.
+```
+
+```
+## Building model
+```
+
+```
+## Setting data and initial values
+```
+
+```
+## Running calculate on model
+##   [Note] Any error reports that follow may simply reflect missing values in model variables.
+```
+
+```
+## Checking model sizes and dimensions
+```
+
+```
+## Checking model calculations
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```
+## Running chain 1 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```
+## Running chain 2 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```r
+summary(samples2) ## from coda
+```
+
+```
+## 
+## Iterations = 1:9000
+## Thinning interval = 1 
+## Number of chains = 2 
+## Sample size per chain = 9000 
+## 
+## 1. Empirical mean and standard deviation for each variable,
+##    plus standard error of the mean:
+## 
+##                   Mean       SD  Naive SE Time-series SE
+## farm_sd        1.75416 0.367024 2.736e-03      0.0097819
+## length_coef[1] 0.03954 0.006953 5.182e-05      0.0001458
+## length_coef[2] 0.07591 0.009874 7.360e-05      0.0002442
+## sex_int[1]     0.95918 0.423000 3.153e-03      0.0369590
+## sex_int[2]     1.58901 0.453549 3.381e-03      0.0420598
+## 
+## 2. Quantiles for each variable:
+## 
+##                   2.5%     25%     50%     75%   97.5%
+## farm_sd        1.16358 1.49469 1.71433 1.96740 2.59974
+## length_coef[1] 0.02622 0.03483 0.03949 0.04417 0.05336
+## length_coef[2] 0.05699 0.06919 0.07566 0.08274 0.09578
+## sex_int[1]     0.10916 0.67570 0.97327 1.23370 1.79298
+## sex_int[2]     0.68415 1.29076 1.59991 1.89229 2.46292
+```
+---
+### GLMM Example: Managing the run with `runMCMC`
+
+
+Start from:
+  
+- Compiled MCMC
+
+
+```r
+samples3 &lt;- runMCMC(cDEmcmc, 
+                    niter = 10000,
+                    nburnin = 1000,
+                    nchains = 2,
+                    samplesAsCodaMCMC = TRUE)
+```
+
+```
+## Running chain 1 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```
+## Running chain 2 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```r
+summary(samples3)
+```
+
+```
+## 
+## Iterations = 1:9000
+## Thinning interval = 1 
+## Number of chains = 2 
+## Sample size per chain = 9000 
+## 
+## 1. Empirical mean and standard deviation for each variable,
+##    plus standard error of the mean:
+## 
+##                   Mean      SD  Naive SE Time-series SE
+## farm_sd        1.76965 0.35976 2.681e-03      0.0095531
+## length_coef[1] 0.03949 0.00687 5.121e-05      0.0001385
+## length_coef[2] 0.07621 0.01020 7.606e-05      0.0002520
+## sex_int[1]     0.97122 0.39856 2.971e-03      0.0341764
+## sex_int[2]     1.60753 0.42724 3.184e-03      0.0336089
+## 
+## 2. Quantiles for each variable:
+## 
+##                   2.5%     25%     50%     75%   97.5%
+## farm_sd        1.20024 1.51378 1.72679 1.97286 2.60712
+## length_coef[1] 0.02634 0.03489 0.03922 0.04401 0.05349
+## length_coef[2] 0.05641 0.06936 0.07603 0.08291 0.09651
+## sex_int[1]     0.19691 0.69338 0.97607 1.24758 1.74912
+## sex_int[2]     0.78393 1.32368 1.61517 1.90269 2.44949
+```
+
+# Other notes
+
+- `readBUGSmodel` will read BUGS/JAGS model code and variables from their standard file formats.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
