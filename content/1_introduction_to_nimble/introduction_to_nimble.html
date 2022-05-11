@@ -30,8 +30,6 @@ class: center, middle, inverse, title-slide
 
 
 
-
-
 ---
 # What Is NIMBLE?
 
@@ -126,16 +124,8 @@ DeerEcervi$farm_ids &lt;- as.numeric(DeerEcervi$fFarm)
 ---
 ### GLMM example: Look at data
 
+&lt;img src="introduction_to_nimble_files/figure-html/unnamed-chunk-4-1.png" style="display: block; margin: auto;" /&gt;
 
-```r
-ggplot(data = DeerEcervi, 
-        mapping = aes(x = ctrLength, y = Ecervi_01, color = fSex)) +
-  geom_point() + 
-  geom_jitter(width = 0, height = 0.1) + 
-  facet_wrap(~Farm, ncol= 6)
-```
-
-&lt;img src="introduction_to_nimble_files/figure-html/unnamed-chunk-5-1.png" height="50%" /&gt;
 `fSex` is 1 for males, 2 for females.
 
 ---
@@ -335,16 +325,15 @@ mcmcplot(samples1, dir = ".", filename = "Ecervi_samples_mcmcplot")
 
 
 
-Results that comes with these slides are [here](orig_Ecervi_samples_mcmcplot.html).
+Results that comes with these slides are [here](orig_Ecervi_samples_mcmcplot.html). Results if you generated your own will be [here](Ecervi_samples_mcmcplot.html).
 
-Results if you generated your own will be [here](Ecervi_samples_mcmcplot.html).
 
----
 2. `coda`
 
 
 ```r
-# We haven't provided coda figures, but you can make make them if you want.
+# We haven't provided coda figures, but you can 
+## make them if you want.
 library(coda)
 pdf("Ecervi_samples_coda.pdf")
 plot(as.mcmc(samples1))
@@ -354,13 +343,14 @@ dev.off()
 Results if you generate the coda pdf will be [here](Ecervi_samples_coda.pdf).
 
 ---
-# MCMC workflow in NIMBLE
+
+## MCMC workflow in NIMBLE
 
 Here is a summary of the MCMC workflow in NIMBLE.
 
 [workflow.png](workflow.png)
 
-----
+---
 ### GLMM Example: Doing it all at once with `nimbleMCMC`
 
 Start from:
@@ -501,6 +491,9 @@ samples3 &lt;- runMCMC(cDEmcmc,
 ## |-------------------------------------------------------|
 ```
 
+---
+
+
 ```r
 summary(samples3)
 ```
@@ -532,7 +525,9 @@ summary(samples3)
 ## sex_int[2]     0.78393 1.32368 1.61517 1.90269 2.44949
 ```
 
-# Other notes
+---
+
+### Other notes
 
 - `readBUGSmodel` will read BUGS/JAGS model code and variables from their standard file formats.
     </textarea>

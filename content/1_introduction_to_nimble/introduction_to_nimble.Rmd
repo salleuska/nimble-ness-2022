@@ -22,10 +22,9 @@ has_ggplot2 <- require(ggplot2)
 has_mcmcplots <- require(mcmcplots)
 has_coda <- require(coda)
 generate_original_results <- FALSE
-```
 
-```{r eval=has_ggplot2, echo=FALSE}
 ggplot2::theme_set(theme_bw())
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 ```
 
 ---
@@ -49,6 +48,56 @@ Numerical Inference for statistical Models using Bayesian and Likelihood Estimat
 - A model-generic programming system to write new analysis methods.
 
 ---
+
+### NIMBLE components
+
+* Model language: A new, extended dialect of BUGS/JAGS for specifying models
+
+* A package of algorithms (MCMC, SMC, MCEM)
+
+* Algorithm language: nimbleFunctions, embedded within R for writing algorithms
+
+* Compiler: Generates and compiles C++ from models and algorithms
+---
+# Why NIMBLE?
+
+Here are some of the features you can do in NIMBLE that we are most excited about and that distinguish NIMBLE from other software:
+
+- customize your MCMCs, including choosing what parameters to block
+
+- define your own distributions and functions for use in BUGS code
+
+- use a variety of algorithms on your model, including MCMC, sequential Monte Carlo (particle filtering), and MCEM
+
+- write an algorithm in our system for easy dissemination to others, including your own MCMC samplers
+
+- call out to arbitrary external (C++, R, etc.) code within a model or algorithm
+
+- compile mathematical operations in R without needing to know or write C or C++
+---
+# Why not NIMBLE?
+
+- For MCMCs that rely heavily on Gibbs sampling, JAGS may be a bit faster because of more efficient internal implementation of the calculations.
+
+- For certain model structures, Hamiltonian Monte Carlo, such as implemented in Stan or PyMC3, may work better than the default MCMC samplers in NIMBLE.
+   1. That said, in a number of examples we've tried we've been able to achieve comparable or better performance either out-of-the-box or with some relatively simple modifications to the model or the MCMC samplers.
+   2. And yet, sometimes customization is time-consuming and requires specialized knowledge.
+  
+- NIMBLE can take a long time to build algorithms for models that have tens of thousands or more nodes (though once built, the algorithm run times can be quite good). We anticipate big improvements in future versions of NIMBLE.
+
+---
+# Getting help with NIMBLE
+
+* User manual ([html](https://r-nimble.org/html_manual/cha-welcome-nimble.html) or [pdf](https://r-nimble.org/manuals/NimbleUserManual.pdf))
+
+* Post to the [NIMBLE user group](https://groups.google.com/forum/#!forum/nimble-users)
+
+* If necessary, email [nimble.stats@gmail.com](the NIMBLE development team)
+
+* Follow announcements via the [NIMBLE announcements list](https://groups.google.com/forum/#!forum/nimble-announce)
+
+---
+
 ### First example: A generalized linear mixed model (GLMM)
 
 * There are plenty of specialized GLMM packages.
@@ -109,15 +158,18 @@ DeerEcervi$farm_ids <- as.numeric(DeerEcervi$fFarm)
 ---
 ### GLMM example: Look at data
 
-```{r eval=has_ggplot2, out.height="50%"}
+```{r eval=has_ggplot2, echo = FALSE,  fig.height=4.5, dpi = 300, fig.align='center'}
 ggplot(data = DeerEcervi, 
         mapping = aes(x = ctrLength, y = Ecervi_01, color = fSex)) +
-  geom_point() + 
+  geom_point(size = 0.5) + 
   geom_jitter(width = 0, height = 0.1) + 
   facet_wrap(~Farm, ncol= 6)
 ```
+
 `fSex` is 1 for males, 2 for females.
 
+---
+INSERT LATEX MODEL CODE? 
 ---
 ### GLMM example: Write the model code **in R**
 
@@ -253,15 +305,14 @@ library(mcmcplots)
 mcmcplot(samples1, dir = ".", filename = "orig_Ecervi_samples_mcmcplot")
 ```
 
-Results that comes with these slides are [here](orig_Ecervi_samples_mcmcplot.html).
+Results that comes with these slides are [here](orig_Ecervi_samples_mcmcplot.html). Results if you generated your own will be [here](Ecervi_samples_mcmcplot.html).
 
-Results if you generated your own will be [here](Ecervi_samples_mcmcplot.html).
 
----
 2. `coda`
 
 ```{r eval = FALSE}
-# We haven't provided coda figures, but you can make make them if you want.
+# We haven't provided coda figures, but you can 
+## make them if you want.
 library(coda)
 pdf("Ecervi_samples_coda.pdf")
 plot(as.mcmc(samples1))
@@ -271,13 +322,14 @@ dev.off()
 Results if you generate the coda pdf will be [here](Ecervi_samples_coda.pdf).
 
 ---
-# MCMC workflow in NIMBLE
+
+## MCMC workflow in NIMBLE
 
 Here is a summary of the MCMC workflow in NIMBLE.
 
 [workflow.png](workflow.png)
 
-----
+---
 ### GLMM Example: Doing it all at once with `nimbleMCMC`
 
 Start from:
@@ -308,14 +360,22 @@ Start from:
 - Compiled MCMC
 
 ```{r}
+ 
 samples3 <- runMCMC(cDEmcmc, 
                     niter = 10000,
                     nburnin = 1000,
                     nchains = 2,
                     samplesAsCodaMCMC = TRUE)
+```
+
+---
+
+```{r}
 summary(samples3)
 ```
 
-# Other notes
+---
+
+### Other notes
 
 - `readBUGSmodel` will read BUGS/JAGS model code and variables from their standard file formats.

@@ -14,6 +14,23 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 
 ## Tentative Schedule
 
+Monday, May 22, 2022 
+Location:
+
+
+Morning: 9am - 12pm
+- Introduction to NIMBLE: basic concepts and workflows
+    - 1_introduction_to_nimble
+    - 2_nimble_models
+- Customizing an MCMC 
+    - 3_customizing_mcmc
+
+Afternoon: 1pm - 5pm
+- Programming in NIMBLE
+    - 4_writing_user_distributions
+    - 5_writing_user_samplers
+- Highlights of special features in NIMBLE
+    - 6_nimble_highlights
 
 ## Help with NIMBLE
 
@@ -23,8 +40,7 @@ We have a 'cheatsheet' [here](https://r-nimble.org/documentation).
 
 For those of you who are not already familiar with writing models in WinBUGS, JAGS, or NIMBLE, you may want to look through the first module (Introduction to NIMBLE) or Section 5.2 of our user manual in advance.
 
-<!-- I'm happy to answer questions about writing models as we proceed through the workshop, but if you have no experience with it, reviewing in advance will greatly lessen the odds you feel lost right at the beginning.
- -->
+
 ## Installing NIMBLE
 
 NIMBLE is an R package on CRAN, so in general it will be straightforward to install as with any R package, but you do need a compiler and related tools on your system.  
