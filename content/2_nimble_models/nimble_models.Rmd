@@ -1,5 +1,5 @@
 ---
-title: "Introduction to NIMBLE"
+title: "NIMBLE models"
 subtitle: "NIMBLE NESS 2022 short course"
 author: "NIMBLE Development Team"
 date: "May 2022"
@@ -8,176 +8,220 @@ date: "May 2022"
 #   beamer_presentation: default
 output:
   xaringan::moon_reader:
+    css: [default, tamu-fonts]
     lib_dir: libs
     nature:
       highlightStyle: github
+      highlightSpans: true
       highlightLines: true
       countIncrementalSlides: false
 ---
 
 ```{r setup, include=FALSE}
 library(nimble)
-source(file.path("..", "examples", "DeerEcervi", "load_DeerEcervi.R"), 
-       chdir = TRUE)
+library(icons)
+
 has_ggplot2 <- require(ggplot2)
 has_mcmcplots <- require(mcmcplots)
 has_coda <- require(coda)
 generate_original_results <- FALSE
 
 ggplot2::theme_set(theme_bw())
-knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+# knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 
 ```
 
+# NIMBLE models: language
+
+### How NIMBLE is the same as BUGS and JAGS
+
+* Most distributions and functions are supported
+
+    - For distributions, see [User Manual Section 5.2.4](http://r-nimble.org/manuals/NimbleUserManual.pdf#page=39) and our [cheatsheet](https://r-nimble.org/cheatsheets/NimbleCheatSheet.pdf)
+    - For functions, see  [User Manual Section 5.2.5](http://r-nimble.org/manuals/NimbleUserManual.pdf#page=44)
+  
+* Most syntax is supported
+
+    - Truncation syntax is different when using `nimbleCode`.  (It can
+      be the same as for JAGS if reading code from a file with `readBUGSmodel()`).
+
+See our [guide online](https://r-nimble.org/quick-guide-for-converting-from-jags-or-bugs-to-nimble).
+
 ---
-# Overview
+# How NIMBLE extends BUGS
 
- - Features of NIMBLE and NIMBLE's model language
+  - Alternative distribution parameterizations (like R).
+  - Named parameters (like R).
+  - Vectorized math (e.g., `pred[1:5] <- b0 + b1*x[1:5]`) and linear algebra.
+  - Definition-time if-then-else (multiple model variants from the same code).
+  - User-defined functions and distributions.
+  - Distinction between `constants` and `data`.
 
- - Converting from WinBUGS/JAGS
+### How NIMBLE is limited compared to BUGS and/or JAGS:
 
- - Models are graphs and why it matters
-
- - Models are R objects that can be operated: calculation and simulation
+NIMBLE is stricter about requiring square brackets and
+   informative indices for non-scalar nodes.
 
 ---
 
-# Alternative distribution parameterizations and named parameters
+# R-like alternative and named parameters
+
+```{r, litters-model-param, eval=FALSE}
+
+littersCode <- nimbleCode({
+  for (i in 1:G) {
+     for (j in 1:N) {
+      # likelihood (data model)
+        r[i,j] ~ dbin(p[i,j], n[i,j])
+    # latent process (random effects)
+        p[i,j] ~ dbeta(a[i], b[i]) 
+     }
+     # prior for hyperparameters
+      a[i] ~ dgamma(shape = 1, `rate` = .001) 
+      b[i] ~ dgamma(shape = 1, `scale` = 1/.001)
+   }
+})
+```
+
+Note that we could have used the mean/sd parameterization of the beta distribution, which would then require different hyperparameter specification.
+
+---
+
+# R-like alternative and named parameters
 
 - BUGS/JAGS: Only `dnorm(mu, tau)` is supported, where `tau` is precision.
+- NIMBLE: Alternative parameterizations and named parameters are supported:
 
-- NIMBLE: Alternative parameterizations and named parameters are supported (but defaults are same as with JAGS/WinBUGS):
-
-    - `dnorm(mean = mu, sd = sigma)`                    
-    - `dnorm(mean = mu, var = sigma_squared)`  
+    - `dnorm(mean = mu, sd = sigma)`
+    - `dnorm(mean = mu, var = sigma_squared)`
+    - `dnorm(mean = mu, tau = phi)` 
     
-    - `dnorm(mean = mu, tau = tau)` (tau = precision)   DEFAULT IF NOT NAMED   
-
 - Distributions with alternative parameterizations are listed in Table 5.2 of [User Manual Section 5.2.4](https://r-nimble.org/html_manual/cha-writing-models.html#subsec:dists-and-functions)
 
----
-
-- Usage in the deer E. cervi example. 
-
-```{r}
-DEcode_partial <- nimbleCode({
-  for(i in 1:2) {
-    # Priors for intercepts and length coefficients for sex = 1 (male), 2 (female)
-    sex_int[i] ~ dnorm(0, sd = 1000)
-    length_coef[i] ~ dnorm(0, sd = 1000)
-  }
-  
-  # Priors for farm random effects and their standard deviation.
-  farm_sd ~ dunif(0, 20)
-  for(i in 1:num_farms) {
-    farm_effect[i] ~ dnorm(0, sd = farm_sd)
-  }
-  # <snip>
-  })
-```
-
-Note we placed the prior directly on the standard deviation parameter. 
----
-In BUGS or JAGS you would need to do this:
-
-```{r, eval=FALSE}
-farm_sd ~ dunif(0, 20)
-farm_prec <- 1/farm_sd^2
-for(i in 1:num_farms) {
-  farm_effect[i] ~ dnorm(0, farm_prec)
-}
-```
 ---
 ## What are constants? What are data?
 
 ### Constants are values needed to define model relationships
 
-- Index ranges like `N`
-- Constant indexing vectors
-- Constants must be provided when creating a model with `nimbleModel`.
+ - Index ranges like *N* in the litters model
+ - Constant vectors used for indexing: e.g., *block* in `mu[block[i]]`
+ - Constants must be provided when creating a model with `nimbleModel`.
 
 ### Data represents a flag on the role a node plays in the model
 
 - E.g., data nodes shouldn't be sampled in MCMC.
 - Data values can be changed.
-- Data can be provided when calling `nimbleModel` or later.
---
+- Data can be provided when calling `nimbleModel` or later
+
+---
+
+Here's an example:
+
+```{r, data-example, eval=TRUE, echo=FALSE}
+if(!exists('littersModel'))
+   source(file.path("..", "examples", "chunks_litters.R"),  chdir = TRUE)
+```
+
+
+```{r, data-example 2}
+littersModel$isData('r')
+littersModel$isData('p')
+littersModel$r
+littersModel$p
+```
+
+---
+Data values are protected from simulation unless you are sure you want to simulate those 
+
+```{r, data-example 3}
+littersModel$simulate('r')
+littersModel$simulate('p') 
+littersModel$r
+littersModel$p
+```
+---
+Data values are protected from simulation unless you are sure you want to simulate those 
+
+```{r, data-example 4}
+littersModel$simulate('r', includeData = TRUE)
+littersModel$r
+```
+---
+
 ### Providing data and constants together.
 
 - Data and constants can be provided together **as `constants`**.
+
 - It would be slightly easier for BUGS/JAGS users to call this "data", but that would blur the concepts.  
+
 - NIMBLE will usually disambiguate data when it is provided as constants.
 
---
+---
 ### What are covariates and other non-parameters/non-observations?
 
 - Covariates/predictors are examples of values that are not parameters nor data in the sense of the likelihood.
+
 - Covariates/predictors can be provided via `constants` if you don't need to change them (often the case).
+
 - Covariates/predictors can be provided via `data` or `inits` if you want to change them.
-    - NIMBLE will not treat them as 'data nodes'.
----
-# Indexing
 
-When values are grouped (particularly in irregular ways), we often have (potentially complicated) indexing.
-
-Here `sex` and `farm_ids` are vectors of  membership indexes that are known in advance. Make sure to provide them in `constants` to avoid unnecessary computation (more later). 
-
-```{r, eval=FALSE}
-for(i in 1:num_animals) {
-  logit(disease_probability[i]) <- 
-    sex_int[ sex[i] ] +
-    length_coef[ sex[i] ] * length[i] +
-    farm_effect[ farm_ids[i] ]
-  Ecervi_01[i] ~ dbern(disease_probability[i])
-}
-```
-
-Particularly in ecological models, indexing can get very complicated.
+- NIMBLE will not treat them as 'data nodes'.
 
 ---
-
-The farm grouping above is 'ragged' (as is the sex grouping). If the number of observations per farm were constant ('regular'/'rectangular'), we could have something like this (ignoring sex and length):
-
-```{r, eval=FALSE}
-for(j in 1:num_farms) 
-  for(i in 1:num_animals_per_farm) {
-    logit(disease_probability[j, i]) <- farm_effect[j]
-    Ecervi_01[j, i] ~ dbern(disease_probability[j, i])
-  }
-```
-
----
-# Converting from JAGS/BUGS to NIMBLE
-
-See our [guide online](https://r-nimble.org/quick-guide-for-converting-from-jags-or-bugs-to-nimble).
-
-### How NIMBLE extends BUGS...
-
- - Alternative distribution parameterizations (like R) [seen above].
-
- - Named parameters (like R) [seen above].
-
- - Distinction between `constants` and `data` [seen above].
--- 
- - Vectorized math and linear algebra [more below].
-
- - Definition-time if-then-else (multiple model variants from the same code) [more below].
-
- - User-defined functions and distributions [more in the afternoon].
----
-### ...and a limitation of NIMBLE
- 
- - NIMBLE is stricter about requiring dimensions for vectors, matrices, and arrays [more below].
-
-### More explicit need to provide dimensions
+### More explicit need to provide dimensions 
+### (in models, not in nimbleFunctions)
 
 - Square brackets must always be provided to indicate number of dimensions
+
     - If `x` is 2-dimensional, use `x[,] %*% beta[]`, not `x %*% beta`
-    - (This limitation only pertains to model code, not `nimbleFunction` programming, which we will cover later.)
+    
 - Sometimes NIMBLE is not as smart as BUGS/JAGS at determining dimensions.  There are two solutions:
-    - Give dimensions explicitly in model code: `x[1:n, 1:m]`, OR
-    - Provide a `dimensions` argument to `nimbleModel`.  
-        - Example: `dimensions = list(x = c(n, m))`.
+
+    - Give dimensions explicitly: `x[1:n, 1:m]`, OR
+    
+    - Provide a `dimensions` argument to `nimbleModel`. 
+    Example: `dimensions = list(x = c(n, m))`.
+
+---
+
+# Vectorized math and linear algebra
+
+Instead of writing this in your model code:
+
+```{r, vectorized-1}
+nimbleOptions(verbose = FALSE)
+m1 <- nimbleModel(
+    nimbleCode({
+        for(i in 1:5) {
+            predicted[i] <- beta0 + beta1 * x[i]
+        }
+    }
+    ))
+```
+you can write this:
+```{r, vectorized-2}
+m2 <- nimbleModel(
+    nimbleCode({
+        predicted[1:5] <- beta0 + beta1 * x[1:5]
+    }
+    ))
+```
+
+---
+
+`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` They are not equivalent:
+
+```{r, vectorized-3}
+## m1 has 5 scalar nodes
+m1$getNodeNames()
+## m2 has 1 vector node
+m2$getNodeNames()
+```
+
+One is not necessarily better than the other.  It depends on the model
+and the MCMC configuration.  (More on those topics later.)
+
+Vectorized declarations do not work for distributions.
 
 ---
 
@@ -185,7 +229,7 @@ See our [guide online](https://r-nimble.org/quick-guide-for-converting-from-jags
 
 This will not work:
 ```{r eval = FALSE}
-x[1:5] <- (A[1:5, 1:5] %*% b[1:5] + c[1:5])
+x[1:5] <- A[1:5, 1:5] %*% b[1:5] + c[1:5]
 ```
 
 The problem is that the right-hand-side returns a matrix, so we can't assign it to a vector.
@@ -196,29 +240,33 @@ x[1:5] <- (A[1:5, 1:5] %*% b[1:5] + c[1:5])[,1]
 ```
 
 ---
+# Definition-time if-then-else
 
-## Definition-time if-then-else
+  - If you wish to define multiple alternative models in one set of code,
+  you can use if-then-else statements.  
+  
+  - These will be evaluated based on variables in the R environment when the model is defined. 
+  
+  - **You cannot use if statements as statements within model code apart from this usage of defining alternative models.**
 
-If you wish to define multiple alternative models in one set of code,
-you can use if-then-else statements.  These will be evaluated based on
-variables in the R environment when the model is defined.  For
-example:
+---
+# Definition-time if-then-else
 
-```{r eval=FALSE}
+For example:
+
+```{r if-then-else}
 code <- nimbleCode({
-  sigma ~ dunif(0, 10)
-  beta0 ~ dnorm(0, sd = 1000)
-  beta1 ~ dnorm(0, sd = 1000)
-  if(INCLUDE_X2) {
-    beta2 ~ dnorm(0, sd = 1000)
-  } 
-  for(i in 1:10) {
-    if(INCLUDE_X2) {
-      y[i] ~ dnorm(beta0 + beta1 * x1[i] + beta2 * x2[i], sd = sigma)
-    } else {
-      y[i] ~ dnorm(beta0 + beta1 * x1[i], sd = sigma)
+    sigma ~ dunif(0, 10)
+    beta0 ~ dnorm(0, sd = 1000)
+    beta1 ~ dnorm(0, sd = 1000)
+    if(INCLUDE_X2) { beta2 ~ dnorm(0, sd = 1000) } else {}
+    for(i in 1:10) {
+        if(INCLUDE_X2) {
+            y[i] ~ dnorm(beta0 + beta1 * x1[i] + beta2 * x2[i], sd = sigma)
+        } else {
+            y[i] ~ dnorm(beta0 + beta1 * x1[i], sd = sigma)
+        }
     }
-  }
 })
 
 INCLUDE_X2 <- FALSE
@@ -227,31 +275,36 @@ INCLUDE_X2 <- TRUE
 m2 <- nimbleModel(code)
 ```
 
-m2 has `beta2` while m1 does not.
+```{r if-then-else 2, results='hide'}
+m1$getNodeNames()
+m2$getNodeNames()
+
+```
+
+m2 has `beta2` while m1 does not.  The long names are "lifted nodes" -- more on those later.
 
 ---
+
+# NIMBLE models: operating with models
 
 ### Models are graphs
 
 - Scientists in many application domains and many statisticians speak of "hierarchical models".
-
 - Computer scientists and others sometimes speak of "graphical models".
-
 - A hierarchical model is typically a directed acyclic graph (DAG).
 
----
-### NIMBLE models as objects
+--
 
-When you create a NIMBLE model, it is an object in R.
+### Models are objects
 
-You can:
+When you create a NIMBLE model, it is an object in R. You can:
 
  - Get or set parameter or data values.
  - Determine graph relationships.
  - Calculate log probabilities.
  - Simulate (draw) from distributions.
  - More.
-
+ 
 ---
 # Linear regression example
 
@@ -283,8 +336,8 @@ model <- nimbleModel(code,
 ---
 ## Draw the graph
 
-This was done with package `igraph`.
-```{r, linmodel-graph, echo = FALSE}
+```{r, linmodel-graph, results ='hide', echo = FALSE, fig.width=10, fig.height=10}
+
 layout <- matrix(ncol = 2, byrow = TRUE,
    # These seem to be rescaled to fit in the plot area,
    # so I'll just use 0-100 as the scale
@@ -302,9 +355,9 @@ sizes <- c(45, 30, 30,
            rep(20, 4))
 
 edge.color <- "black"
-stoch.color <- "deepskyblue2"
-det.color <- "orchid3"
-rhs.color <- "gray73"
+stoch.color <- "skyblue1"
+det.color <- "lightsalmon"
+rhs.color <- "aliceblue"
 fill.color <- c(
     rep(stoch.color, 3),
     rep(rhs.color, 4),
@@ -312,6 +365,7 @@ fill.color <- c(
     rep(stoch.color, 4)
 )
 
+par(mar=c(0,0,0,0)+.1)
 plot(model$graph, vertex.shape = "crectangle",
      vertex.size = sizes,
      vertex.size2 = 20,
@@ -323,312 +377,90 @@ plot(model$graph, vertex.shape = "crectangle",
      edge.color = edge.color)
 ```
 
+
+![](`r knitr::fig_chunk("linmodel-graph", "png")`)
+
 - Think of each line of BUGS language code as declaring one or mode *nodes*.
 
----
-# Get and set values
-
-This is done in natural R syntax.
-```{r}
-model$sigma
-model$x
-model$x[3] <- 0.6
-model$x
-```
-
-This can be done with a compiled model too.
-
-# You can even get and set data values
-
-```{r}
-model$y
-model$y[1] <- 0.8
-model$y
-```
 
 ---
-## Why would this be useful?
 
-### Get names of nodes in the graph
+### Operating the models: values in the model
 
-```{r}
-model$getNodeNames()
-```
-
-### Get types of nodes
-```{r}
-model$getNodeNames(dataOnly = TRUE)
-```
-
-```{r}
-model$getNodeNames(determOnly = TRUE)
-```
-
-```{r}
-model$isData('y')
-model$isData('x')
-```
-
-### Get node relationships
-
-```{r}
-model$getDependencies("x[2]")
-```
-
-```{r}
-model$getDependencies("sigma")
-```
-
-```{r}
-model$getDependencies("slope")
-```
-
----
-## Why do node relationships matter?
-
-For typical MCMC samplers, `model$getDependencies('slope')` returns the nodes that need to be calculated when sampling (updating) `slope`.
-
-Results from `model$getDependencies` are in *topologically sorted* order:
-
-- If you calculate them in order, you'll get correct results.
-- E.g., `predicted.y[2]` comes before `y[2]`.
-
---- 
-## Why provide indexes as constants?
-
-Recall the likelihood component of the deer E. cervi model:
-
-```{r, eval=FALSE}
-for(i in 1:num_animals) {
-  logit(disease_probability[i]) <- 
-    sex_int[ sex[i] ] +
-    length_coef[ sex[i] ] * Length[i] +
-    farm_effect[ farm_ids[i] ]
-  Ecervi_01[i] ~ dbern(disease_probability[i])
-```
-
-Let's consider passing `farm_ids` either in `constants` or in `data`.
-
-```{r}
-DEconstants <- list(num_farms = 24,
-                    num_animals = 826,
-                    cLength = DeerEcervi$cLength,
-                    sex = DeerEcervi$Sex,
-                    farm_ids = DeerEcervi$farm_ids)
-DEdata <- list(Ecervi_01 = DeerEcervi$Ecervi_01)
-
-m_light <- nimbleModel(DEcode, constants = DEconstants)
-
-DEconstants <- list(num_farms = 24,
-                    num_animals = 826,
-                    cLength = DeerEcervi$cLength)
-DEdata <- list(Ecervi_01 = DeerEcervi$Ecervi_01,
-                    sex = DeerEcervi$Sex,
-                    farm_ids = DeerEcervi$farm_ids)
-m_heavy <-  nimbleModel(DEcode, data = DEdata, constants = DEconstants)
-```
-
-Now let's look at the dependency (graph) structure.
-
-```{r}
-m_light$getDependencies('farm_effect[1]')
-too_many_deps <- m_heavy$getDependencies('farm_effect[1]')
-length(too_many_deps)
-head(too_many_deps, n = 30)
-```
-
-If `farm_ids` (and `sex`) are not known to NIMBLE to be constants, then all the observations could potentially depend on any element of `farm_effect`, `sex_int`, `length_coef`.
-
-Consider what would happen in a Metropolis-Hastings sampler for `farm_effect[1]` in the 'heavy' model.
-
----
-### Nodes vs. variables
-
-In NIMBLE:
-
-- A variable is an object that may contain multiple nodes.  
-
-    - `y` is a variable.
-
-- A node is a part of a variable declared in one line of BUGS code.
-
-    - `y[1]` ... `y[4]` are scalar nodes.
+What's the current value in a variable?
 
 
-# How vectorizing changes nodes
-
-```{r}
-code2 <- nimbleCode({
-  intercept ~ dnorm(0, sd = 1000)
-  slope ~ dnorm(0, sd = 1000)
-  sigma ~ dunif(0, 100)
-  predicted.y[1:4] <- intercept + slope * x[1:4] # vectorized node
-  for(i in 1:4) {
-    # predicted.y[i] <- intercept + slope * x[i] # scalar nodes (earlier model version)
-    y[i] ~ dnorm(predicted.y[i], sd = sigma)
-  }
-})
-
-model2 <- nimbleModel(code2, 
-                      data = list(y = rnorm(4)),
-                      inits = list(intercept = 0.5, 
-                                   slope = 0.2, 
-                                   sigma = 1,
-                                   x = c(0.1, 0.2, 0.3, 0.4)))
-```
-
----
-## Look at nodes in the vectorized model
-
-```{r}
-model2$getNodeNames()
-```
-
-```{r}
-model2$getDependencies('x[2]')
-```
-
-In this case, if `x[2]` had a prior and was being sampled in MCMC, it would be inefficient to calculate all of `y[1]`, `y[2]`, `y[3]`, `y[4]`.  
-
----
-# Log probability calculations
-
-```{r}
-model2$calculate('y[1:4]')
-```
-
-This is the sum of log probabilities of all stochastic nodes in the calculation.
-
-Deterministic nodes have their values calculated but contribute 0 to the log probability.
-
-```{r}
-model2$getDependencies('intercept')
-model2$calculate(model2$getDependencies('intercept'))
-```
-
-In this case, this is the sum of log probabilities from almost the entire model.
-
-Only the priors for `slope` and `sigma` are not included.
-
----
-# Simulating from the model
-
-In this model, there are no random effects.  The only stochastic nodes are data or parameters with priors.
-
-```{r}
-model2$sigma
-model2$simulate('sigma')
-model2$sigma
-```
-
-Data values are protected from simulation unless you are sure.
-
-(The following is not good model-generic programming. More in the next few slides.)
-
-```{r}
-model2$y
-model2$simulate('y') ## Will not over-write data nodes
-model2$y
-model2$simulate('y', includeData = TRUE) ## will over-write data nodes
-model2$y
-```
-
----
-# Understanding *lifted nodes*
-
-Consider the following version of our linear regression model.
-
-There is no `predicted.y[i]`.  The expression from that is directly in the `dnorm` for `y[i]`. Also, we now use the variance instead of the standard deviation in the likelihood.
-
-```{r}
-code3 <- nimbleCode({
-  intercept ~ dnorm(0, sd = 1000)
-  slope ~ dnorm(0, sd = 1000)
-  sigma2 ~ dinvgamma(1, 1)  # this sort of prior not generally recommended
-  for(i in 1:4) {
-    y[i] ~ dnorm(intercept + slope * x[i], var = sigma2)
-  }
-})
-model3 <- nimbleModel(code3, 
-                      data = list(y = rnorm(4)),
-                      inits = list(intercept = 0.5, 
-                                   slope = 0.2, 
-                                   sigma2 = 1,
-                                   x = c(0.1, 0.2, 0.3, 0.4)))
+```{r, model-values}
+littersModel$r  
+littersModel$a[1]
+littersModel$p
 ```
 
 ---
 
-## Look at the nodes
-```{r}
-model3$getNodeNames()
-```
+Setting values:
 
-NIMBLE has created nodes in the role of `predicted.y[i]` and `sigma`.
-
-These are called *lifted nodes*.  They are created by "lifting" an expression out of a parameter for a distribution and creating a deterministic node for that expression.
-
-Why does NIMBLE do that?
-
----
-# Model-generic programming: concrete example
-
-If we change `sigma2` and then directly try to work with `y`, we'll cause (silent errors) because the lifted standard deviation has not been updated.
-
-```{r, lifted}
-model3$sigma2 <- 100
-model3$lifted_sqrt_oPsigma2_cP
-model3$simulate('y', includeData = TRUE)
-summary(model3$y)
-depNodes <- model3$getDependencies('sigma2', self = FALSE)
-depNodes
-model3$simulate(depNodes, includeData = TRUE)
-model3$lifted_sqrt_oPsigma2_cP
-summary(model3$y)
+```{r, model-set-values}
+littersModel$a[1] <- 5
+littersModel$a
 ```
 
 ---
-# Model-generic programming
 
-Say we want a function that simulates all parts of a model that depend on some input nodes and then returns the corresponding summed log probability.  I will call this part of the model "downstream".
+### Operating the model: *simulate()*
+ 
+We have control over the model. In particular, for every node, NIMBLE provides **`calculate()`** and **`simulate()`** functions that calculate the current probability density value for the node and simulate a new value for the node from its (prior) distribution (i.e., given only parent nodes). These operations lie at the heart of many algorithms.
 
-```{r, generic-simulate}
-simulate_downstream <- function(model, nodes) {
-  downstream_nodes <- model$getDependencies(nodes, downstream = TRUE)
-  model$simulate( downstream_nodes, includeData = TRUE )
-  logProb <- model$calculate( downstream_nodes )
-  logProb
-}
+**`simulate()`** puts new values into the model; if you want to see those values, you need to look into the model.
+.scroll-output[
+```{r, model-simulate}
+set.seed(1)  # so the calculations are reproducible
+littersModel$simulate('p')  # simulate from prior
+littersModel$p
+littersModel$getLogProb('p')  # log prob not yet updated!
+littersModel$calculate('p')   # update it
+littersModel$getLogProb('p')  # now we're good
 ```
-Notice that this function will work with *any* model and *any* set of input nodes.
+]
+---
 
+# Operating the model: *calculate()* 
 
-```{r}
-model3$y
-simulate_downstream(model3, 'sigma2')
-model3$y
+Let's change values in the model and recalculate the density values. NIMBLE sometimes introduces hidden nodes not specified in the model, so when calculating model density values, it's best to ask NIMBLE to do so based on the dependencies of the altered node.
+
+```{r, model-operate}
+littersModel$getLogProb('p')
+littersModel$a[1] <- 1
+littersModel$b[1] <- 3
+littersModel$getLogProb('p')  # recall why this hasn't changed yet
+
+## DON'T DO THIS! (though it's ok to do here...)
+## littersModel$calculate('p')
+
+## INSTEAD DO THIS
+deps <- littersModel$getDependencies(c('a[1]','b[1]'))
+littersModel$calculate(deps)
+
+## alternatively, we could just update the entire model to be safe:
+## littersModel$calculate()
+
+## now that model state is updated, can ask for logProbs
+littersModel$getLogProb('p')
 ```
 
-In this case, the model doesn't have much hierarchical structure.
 
-# Always use graph structure in model-generic programming
-
-You may not know where there are lifted nodes.
-
-Always determine what to `calculate` or `simulate` from `getDependencies` or other such tools.
 
 ---
-# Exercises
+### Small recap
 
-1) Please run through the code from this module and use the commands discussed to understand the nodes and dependency structure of the deer E. cervi example.
+ - **data**: a known quantity in a model, also represented as a random variable, e.g., `r[1,1], r[1,2], ...` in the litters model
+ 
+ - **constants**: other fixed quantities involved in the model, e.g., `N` in the litters model
+ 
+ - **node**: an element in the model graph representing data, parameter, or a deterministic quantity that is a function of other quantities in the model, e.g. `a[1]`, `a[2]`, and `r[1, 2]` in the litters model
+    - nodes can be univariate or multivariate depending on whether they ae defined based on a joint (multivariate) density or joint assignment
+    
+ - **variable**: a collection of one or more nodes with the same name, e.g., 'a' or 'r' in the litters model
+ 
+---
 
-2) Write code to fix the hyperparameters of the deer E. cervi example and given those fixed values, generate random farm effects and new observations, as would be needed for a simulation study:
-
-```{r, eval=FALSE}
-model$farm_sd <- 1
-model$sex_int <- c(1.5, 2.5)
-model$length_coef <- c(0.3, 0.5)
-# explore the arguments for `getDependencies` and `simulate`
-deps <- model$getDependencies('???')
-model$simulate(???)
-```

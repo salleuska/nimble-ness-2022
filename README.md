@@ -5,20 +5,20 @@ To prepare for the workshop:
 
  - Install NIMBLE (see below)
  - Install additional packages (see below)
+<!--
  - Download these materials (and check back before the workshop on Monday May 23 for updates)
 
 All materials for the workshop will be in this GitHub repository. If you're familiar with Git/GitHub, you already know how to get all the materials on your computer. If you're not, simply click *insert link*.
 
-<!-- There is some overview information [here (https://htmlpreview.github.io/?https://github.com/nimble-training/nimble-lisbon-2022/blob/main/overview.html), including links to the content modules in order.
+ There is some overview information [here (https://htmlpreview.github.io/?https://github.com/nimble-training/nimble-lisbon-2022/blob/main/overview.html), including links to the content modules in order.
  -->
 
 ## Tentative Schedule
 
 Monday, May 22, 2022 
-Location:
+Location: AUST 108
 
-
-Morning: 9am - 12pm
+Morning: 9am - 12pm 
 - Introduction to NIMBLE: basic concepts and workflows
     - 1_introduction_to_nimble
     - 2_nimble_models
@@ -62,7 +62,7 @@ model <- nimbleModel(code)
 cModel <- compileNimble(model)
 ```
 
-If that runs without error, you're all set. If not, please see the troubleshooting tips and email me at spaganin@hsph.harvard.edu directly if you can't get things going.  
+If that runs without error, you're all set. If not, please see the [troubleshooting tips](https://r-nimble.org/html_manual/cha-installing-nimble.html#troubleshooting-installation-problems) and email me at spaganin@hsph.harvard.edu directly if you can't get things going.  
 
 In general we encourage you to update to the most recent version of NIMBLE, 0.12.2.
 
