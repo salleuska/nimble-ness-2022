@@ -1,0 +1,309 @@
+---
+title: "Customizing an MCMC`"
+subtitle: "NIMBLE NESS 2022 short course"
+author: "NIMBLE Development Team"
+date: "May 2022"
+# output:
+#   slidy_presentation: default
+#   beamer_presentation: default
+output:
+  xaringan::moon_reader:
+    css: [default, tamu-fonts, mystyle.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightSpans: true
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r chunksetup, include=FALSE} 
+# include any code here you don't want to show up in the document,
+# e.g. package and dataset loading
+library(methods)  # otherwise new() not being found - weird
+library(nimble)
+library(coda)
+
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
+```
+
+
+```{r, data-example, eval=TRUE, echo=FALSE, results = 'hide', message=FALSE}
+if(!exists('littersModel'))
+   source(file.path("..", "examples", "chunks_litters.R"),  chdir = TRUE)
+```
+
+### Customizing samplers: examining the defaults
+
+One of NIMBLE's most important features is that users can easily modify the MCMC algorithm used for their model. The easiest thing to do is to start with NIMBLE's default MCMC and then make modifications. 
+
+.scroll-box-16[
+```{r default-config}
+littersConf$printSamplers()
+```
+]
+---
+### Customizing samplers: modifying the samplers
+
+Let's try using slice samplers (these are used by default much more heavily in JAGS than in NIMBLE).
+
+
+.scroll-box-10[
+```{r customize-mcmc}
+hypers <- c('a[1]', 'b[1]', 'a[2]', 'b[2]')
+for(h in hypers) {
+      littersConf$removeSamplers(h)
+      littersConf$addSampler(target = h, type = 'slice')
+}
+
+littersConf$printSamplers()
+
+```
+]
+
+---
+
+```{r customize-mcmc 2}
+littersMCMC <- buildMCMC(littersConf)
+## We need 'resetFunctions' because we are rebuilding the MCMC for an existing model for
+## which we've already done some compilation.
+cLittersMCMC <- compileNimble(littersMCMC, project = littersModel,
+   resetFunctions = TRUE)
+
+niter <- 5000
+nburn <- 1000
+
+set.seed(1)
+samplesSlice <- runMCMC(cLittersMCMC, niter = niter, nburnin = nburn,
+             inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+```
+
+---
+### Customizing samplers: Initial results
+
+We can look at diagnostics and see if the change in samplers had an effect.
+
+- **Effective sample size (ESS)** is the equivalent number of independent samples in an MCMC chain for one parameter. The `effectiveSize` function of package `coda` gives one estimator of ESS.  (The `mcmcse` and `rstan` packages have other estimators.)
+
+.scroll-box-16[
+```{r output-slice1}
+dim(samplesSlice) ## Independent samples would have ESS=4000
+effectiveSize(samplesSlice)
+```
+]
+
+---
+
+```{r output-slice 2, fig.height=6, fig.width=12, fig.cap=''}
+makePlot(samplesSlice)
+```
+
+Here, simply changing the univariate samplers doesn't have much effect, because the real problem is in the posterior correlation between `a[i]` and `b[i]`. But in other cases it can make a bigger difference.
+
+---
+### Blocking parameters
+
+Often a key factor that reduces MCMC performance is dependence between parameters that limits the ability of univariate samplers to move very far. A standard strategy is to sample correlated parameters in blocks. Unlike many other MCMC engines, NIMBLE makes it easy for users to choose what parameters to sample in blocks.
+
+We'll try that here for `a` and `b`.
+
+```{r customize-mcmc2}
+niter <- 5000
+nburn <- 1000
+
+littersConf <- configureMCMC(littersModel, monitors = c('a', 'b', 'p'))
+```
+
+---
+
+```{r customize-mcmc3}
+hypers <- littersModel$getNodeNames(topOnly = TRUE)
+print(hypers)
+for(h in hypers) {
+      littersConf$removeSamplers(h)
+}
+
+littersConf$addSampler(target = c('a[1]','b[1]'), type = 'RW_block', 
+                              control = list(adaptInterval = 20, 
+                                             adaptFactorExponent = 0.25))
+littersConf$addSampler(target = c('a[2]','b[2]'), type = 'RW_block', 
+                              control = list(adaptInterval = 20, 
+                                             adaptFactorExponent = 0.25))
+
+```
+
+
+```{r customize-mcmc4, message=FALSE}
+
+littersMCMC <- buildMCMC(littersConf)
+cLittersMCMC <- compileNimble(littersMCMC, project = littersModel, resetFunctions = TRUE)
+
+set.seed(1)
+samplesBlock <- runMCMC(cLittersMCMC, niter = niter, nburnin = nburn,
+             inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+```
+
+---
+.scroll-box-16[
+```{r output-block1}
+effectiveSize(samplesBlock)
+
+```
+]
+---
+
+```{r output-block2, fig.height=6, fig.width=12, fig.cap=''}
+makePlot(samplesBlock)
+```
+
+The block sampler seems to help some, but hopefully we can do better. Often block sampling gives bigger improvements, but it can be sensitive to how it's configured/initialized.
+
+---
+### NIMBLE
+
+
+**Caveat**: the real question is the effective sample size per unit of computation time (each slice sampler iteration is much slower than each Metropolis iteration), but we didn't assess that in this example.
+
+
+---
+### More resources for comparisons
+
+[`compareMCMCs`](https://github.com/nimble-dev/compareMCMCs) is an R package available on GitHub for managing performance comparisons among MCMC methods, particularly in `nimble`.  
+
+- `compareMCMCs` manages multiple MCMC runs and times steps of preparation (compilation) and sampling.
+
+- It can also run other MCMC "engines" via a plug-in system.  Currently there are plug-ins for JAGS and Stan.  Plug-ins for JAGS and OpenBUGS/WinBUGS (not yet implemented) can use the same model as `nimble` if it is compatible.
+
+- Choice of performance metrics is extensible by a plug-in system.
+
+- It can generate comparison figures. Components included are extensible by a plug-in system.
+
+- It can convert between different parameter names or parameterizations across MCMC engines.
+
+---
+
+### Think like a graph: reducing dependencies
+
+Consider a basic state-space model.
+
+Observation equation: $y_t \sim f(y_t | x_t)$. 
+State equation: $x_t \sim g(x_t | x_{t-1})$
+
+Two equivalent ways to write state-space models:
+
+.pull-left[
+1)
+```{r}
+code_heavy <- nimbleCode({
+  for(t in 1:n) {
+    y[t] ~ dnorm(x[t], sd = sigma)
+  }
+  for(t in 2:n) {
+    x[t] <- x[t-1] + eps[t-1]
+    eps[t] ~ dnorm(0, sd = omega)
+  }
+})
+```
+Process-noises are random variables.  States are deterministic given process noises. 
+]
+
+.pull-right[
+2) 
+```{r}
+code_light <- nimbleCode({
+  for(t in 1:n) {
+    y[t] ~ dnorm(x[t], sd = sigma)
+  }
+  for(t in 2:n){
+    x[t] ~ dnorm(x[t-1], 
+                 sd = omega)
+  }
+})
+```
+States are random variables.
+]
+
+---
+### Think like a graph: reducing dependencies (2)
+
+```{r, message=FALSE}
+n <- 20
+m_heavy <- nimbleModel(code_heavy, 
+                       data = list(y = rnorm(n)), 
+                       constants = list(n = n))
+m_light <- nimbleModel(code_light, 
+                       data = list(y = rnorm(n)), 
+                       constants = list(n = n))
+```
+
+What calculations are required to update `eps[18]` or `eps[1]` compared to `x[18]` or `x[1]`?
+
+.scroll-box-14[
+```{r}
+m_heavy$getDependencies('eps[18]')
+m_light$getDependencies('x[18]')
+
+m_heavy$getDependencies('eps[1]')
+m_light$getDependencies('x[1]')
+```
+]
+`eps[1]` affects all the `x[t]` values and therefore all the `y[t]` values! 
+---
+### Think like a graph: when to vectorize
+
+Vectorizing some calculations:
+
+- Can make code more compact.
+- Can make model and MCMC building and compiling faster (fewer nodes).
+- Can improve MCMC efficiency, but sometimes not by much (less looping over nodes).
+- Can hurt MCMC efficiency if done in the wrong places (if unneeded dependencies are introduced).
+
+```{r, message=FALSE}
+code <- nimbleCode({
+  intercept ~ dnorm(0, sd = 1000)
+  slope ~ dnorm(0, sd = 1000)
+  sigma ~ dunif(0, 100)
+  predicted.y[1:4] <- intercept + slope * x[1:4] # vectorized node
+  for(i in 1:4) {
+    y[i] ~ dnorm(predicted.y[i], sd = sigma)
+  }
+})
+model <- nimbleModel(code, data = list(y = rnorm(4)))
+
+```
+
+---
+```{r}
+model$getDependencies('slope')
+```
+ 
+Here sampling of `slope` (and `intercept`) will probably be a bit more efficient because of the vectorized definition of `predicted.y`, since all observations depend on `slope` (and `intercept`). 
+
+We avoid some overhead by having one `predicted.y[1:4]` node rather than four `predicted.y[1], ..., predicted.y[4]` nodes.
+
+Another (manual) step would be to create a user-defined vectorized `dnorm` distribution so `y[1:4]` is a vector node. 
+
+---
+### Think like a graph: when not to vectorize
+
+However, if `x[2]` (and the other 'x's) were a scalar parameter (in this case a random effect), vectorization is likely a bad idea. Any update for `x[2]` will calculate `predicted.y[1:4]` and `y[1],...,y[4]` when only `predicted.y[2]` and `y[2]` need to be calculated.
+
+```{r, message=FALSE}
+code <- nimbleCode({
+  intercept ~ dnorm(0, sd = 1000)
+  slope ~ dnorm(0, sd = 1000)
+  sigma ~ dunif(0, 100)
+  predicted.y[1:4] <- intercept + slope * x[1:4] # vectorized node
+  for(i in 1:4) {
+    x[i] ~ dnorm(0, 1)   # scalar random effects
+    y[i] ~ dnorm(predicted.y[i], sd = sigma)
+  }
+})
+model <- nimbleModel(code, data = list(y = rnorm(4)))
+```
+
+```{r}
+model$getDependencies('x[2]')
+```
+In this case, vectorization has made more dependencies for `x[2]` than should be necessary.  This would result in wasted computation during MCMC sampling.
+

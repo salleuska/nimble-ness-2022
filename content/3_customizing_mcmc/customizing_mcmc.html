@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Customizing an MCMC`</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/tamu-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mystyle.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Customizing an MCMC`
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
+---
+
+
+
+
+
+
+
+### Customizing samplers: examining the defaults
+
+One of NIMBLE's most important features is that users can easily modify the MCMC algorithm used for their model. The easiest thing to do is to start with NIMBLE's default MCMC and then make modifications. 
+
+.scroll-box-16[
+
+```r
+littersConf$printSamplers()
+```
+
+```
+## [1]  RW sampler: a[1]
+## [2]  RW sampler: a[2]
+## [3]  RW sampler: b[1]
+## [4]  RW sampler: b[2]
+## [5]  conjugate_dbeta_dbin_identity sampler: p[1, 1]
+## [6]  conjugate_dbeta_dbin_identity sampler: p[1, 2]
+## [7]  conjugate_dbeta_dbin_identity sampler: p[1, 3]
+## [8]  conjugate_dbeta_dbin_identity sampler: p[1, 4]
+## [9]  conjugate_dbeta_dbin_identity sampler: p[1, 5]
+## [10] conjugate_dbeta_dbin_identity sampler: p[1, 6]
+## [11] conjugate_dbeta_dbin_identity sampler: p[1, 7]
+## [12] conjugate_dbeta_dbin_identity sampler: p[1, 8]
+## [13] conjugate_dbeta_dbin_identity sampler: p[1, 9]
+## [14] conjugate_dbeta_dbin_identity sampler: p[1, 10]
+## [15] conjugate_dbeta_dbin_identity sampler: p[1, 11]
+## [16] conjugate_dbeta_dbin_identity sampler: p[1, 12]
+## [17] conjugate_dbeta_dbin_identity sampler: p[1, 13]
+## [18] conjugate_dbeta_dbin_identity sampler: p[1, 14]
+## [19] conjugate_dbeta_dbin_identity sampler: p[1, 15]
+## [20] conjugate_dbeta_dbin_identity sampler: p[1, 16]
+## [21] conjugate_dbeta_dbin_identity sampler: p[2, 1]
+## [22] conjugate_dbeta_dbin_identity sampler: p[2, 2]
+## [23] conjugate_dbeta_dbin_identity sampler: p[2, 3]
+## [24] conjugate_dbeta_dbin_identity sampler: p[2, 4]
+## [25] conjugate_dbeta_dbin_identity sampler: p[2, 5]
+## [26] conjugate_dbeta_dbin_identity sampler: p[2, 6]
+## [27] conjugate_dbeta_dbin_identity sampler: p[2, 7]
+## [28] conjugate_dbeta_dbin_identity sampler: p[2, 8]
+## [29] conjugate_dbeta_dbin_identity sampler: p[2, 9]
+## [30] conjugate_dbeta_dbin_identity sampler: p[2, 10]
+## [31] conjugate_dbeta_dbin_identity sampler: p[2, 11]
+## [32] conjugate_dbeta_dbin_identity sampler: p[2, 12]
+## [33] conjugate_dbeta_dbin_identity sampler: p[2, 13]
+## [34] conjugate_dbeta_dbin_identity sampler: p[2, 14]
+## [35] conjugate_dbeta_dbin_identity sampler: p[2, 15]
+## [36] conjugate_dbeta_dbin_identity sampler: p[2, 16]
+```
+]
+---
+### Customizing samplers: modifying the samplers
+
+Let's try using slice samplers (these are used by default much more heavily in JAGS than in NIMBLE).
+
+
+.scroll-box-10[
+
+```r
+hypers &lt;- c("a[1]", "b[1]", "a[2]", "b[2]")
+for (h in hypers) {
+    littersConf$removeSamplers(h)
+    littersConf$addSampler(target = h, type = "slice")
+}
+
+littersConf$printSamplers()
+```
+
+```
+## [1]  conjugate_dbeta_dbin_identity sampler: p[1, 1]
+## [2]  conjugate_dbeta_dbin_identity sampler: p[1, 2]
+## [3]  conjugate_dbeta_dbin_identity sampler: p[1, 3]
+## [4]  conjugate_dbeta_dbin_identity sampler: p[1, 4]
+## [5]  conjugate_dbeta_dbin_identity sampler: p[1, 5]
+## [6]  conjugate_dbeta_dbin_identity sampler: p[1, 6]
+## [7]  conjugate_dbeta_dbin_identity sampler: p[1, 7]
+## [8]  conjugate_dbeta_dbin_identity sampler: p[1, 8]
+## [9]  conjugate_dbeta_dbin_identity sampler: p[1, 9]
+## [10] conjugate_dbeta_dbin_identity sampler: p[1, 10]
+## [11] conjugate_dbeta_dbin_identity sampler: p[1, 11]
+## [12] conjugate_dbeta_dbin_identity sampler: p[1, 12]
+## [13] conjugate_dbeta_dbin_identity sampler: p[1, 13]
+## [14] conjugate_dbeta_dbin_identity sampler: p[1, 14]
+## [15] conjugate_dbeta_dbin_identity sampler: p[1, 15]
+## [16] conjugate_dbeta_dbin_identity sampler: p[1, 16]
+## [17] conjugate_dbeta_dbin_identity sampler: p[2, 1]
+## [18] conjugate_dbeta_dbin_identity sampler: p[2, 2]
+## [19] conjugate_dbeta_dbin_identity sampler: p[2, 3]
+## [20] conjugate_dbeta_dbin_identity sampler: p[2, 4]
+## [21] conjugate_dbeta_dbin_identity sampler: p[2, 5]
+## [22] conjugate_dbeta_dbin_identity sampler: p[2, 6]
+## [23] conjugate_dbeta_dbin_identity sampler: p[2, 7]
+## [24] conjugate_dbeta_dbin_identity sampler: p[2, 8]
+## [25] conjugate_dbeta_dbin_identity sampler: p[2, 9]
+## [26] conjugate_dbeta_dbin_identity sampler: p[2, 10]
+## [27] conjugate_dbeta_dbin_identity sampler: p[2, 11]
+## [28] conjugate_dbeta_dbin_identity sampler: p[2, 12]
+## [29] conjugate_dbeta_dbin_identity sampler: p[2, 13]
+## [30] conjugate_dbeta_dbin_identity sampler: p[2, 14]
+## [31] conjugate_dbeta_dbin_identity sampler: p[2, 15]
+## [32] conjugate_dbeta_dbin_identity sampler: p[2, 16]
+## [33] slice sampler: a[1]
+## [34] slice sampler: b[1]
+## [35] slice sampler: a[2]
+## [36] slice sampler: b[2]
+```
+]
+
+---
+
+
+```r
+littersMCMC &lt;- buildMCMC(littersConf)
+## We need 'resetFunctions' because we are rebuilding the
+## MCMC for an existing model for which we've already done
+## some compilation.
+cLittersMCMC &lt;- compileNimble(littersMCMC, project = littersModel,
+    resetFunctions = TRUE)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+niter &lt;- 5000
+nburn &lt;- 1000
+
+set.seed(1)
+samplesSlice &lt;- runMCMC(cLittersMCMC, niter = niter, nburnin = nburn,
+    inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+```
+
+```
+## Running chain 1 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+---
+### Customizing samplers: Initial results
+
+We can look at diagnostics and see if the change in samplers had an effect.
+
+- **Effective sample size (ESS)** is the equivalent number of independent samples in an MCMC chain for one parameter. The `effectiveSize` function of package `coda` gives one estimator of ESS.  (The `mcmcse` and `rstan` packages have other estimators.)
+
+.scroll-box-16[
+
+```r
+dim(samplesSlice)  ## Independent samples would have ESS=4000
+```
+
+```
+## [1] 4000   36
+```
+
+```r
+effectiveSize(samplesSlice)
+```
+
+```
+##        a[1]        a[2]        b[1]        b[2]     p[1, 1]     p[2, 1] 
+##    7.191837  151.663356    6.188247  154.552882   20.128276 1085.328914 
+##     p[1, 2]     p[2, 2]     p[1, 3]     p[2, 3]     p[1, 4]     p[2, 4] 
+##   20.238555  601.112686   20.063697  931.421591   21.024985 1145.733949 
+##     p[1, 5]     p[2, 5]     p[1, 6]     p[2, 6]     p[1, 7]     p[2, 7] 
+##   22.420767 3652.783783   19.611488 2837.102882   20.773575 2866.668779 
+##     p[1, 8]     p[2, 8]     p[1, 9]     p[2, 9]    p[1, 10]    p[2, 10] 
+##   20.998934 3438.916187   19.827334 3494.220502   21.867572 3785.298842 
+##    p[1, 11]    p[2, 11]    p[1, 12]    p[2, 12]    p[1, 13]    p[2, 13] 
+##   21.243242 4000.000000   19.291943 2276.795580   19.951566 1581.485675 
+##    p[1, 14]    p[2, 14]    p[1, 15]    p[2, 15]    p[1, 16]    p[2, 16] 
+##   21.350778 2133.962392   22.320359 1059.973627   22.602981  529.167894
+```
+]
+
+---
+
+
+```r
+makePlot(samplesSlice)
+```
+
+![](customizing_mcmc_files/figure-html/output-slice 2-1.png)&lt;!-- --&gt;
+
+Here, simply changing the univariate samplers doesn't have much effect, because the real problem is in the posterior correlation between `a[i]` and `b[i]`. But in other cases it can make a bigger difference.
+
+---
+### Blocking parameters
+
+Often a key factor that reduces MCMC performance is dependence between parameters that limits the ability of univariate samplers to move very far. A standard strategy is to sample correlated parameters in blocks. Unlike many other MCMC engines, NIMBLE makes it easy for users to choose what parameters to sample in blocks.
+
+We'll try that here for `a` and `b`.
+
+
+```r
+niter &lt;- 5000
+nburn &lt;- 1000
+
+littersConf &lt;- configureMCMC(littersModel, monitors = c("a",
+    "b", "p"))
+```
+
+```
+## ===== Monitors =====
+## thin = 1: a, b, p
+## ===== Samplers =====
+## RW sampler (4)
+##   - a[]  (2 elements)
+##   - b[]  (2 elements)
+## conjugate sampler (32)
+##   - p[]  (32 elements)
+```
+
+---
+
+
+```r
+hypers &lt;- littersModel$getNodeNames(topOnly = TRUE)
+print(hypers)
+```
+
+```
+## [1] "a[1]" "a[2]" "b[1]" "b[2]"
+```
+
+```r
+for (h in hypers) {
+    littersConf$removeSamplers(h)
+}
+
+littersConf$addSampler(target = c("a[1]", "b[1]"), type = "RW_block",
+    control = list(adaptInterval = 20, adaptFactorExponent = 0.25))
+```
+
+```
+##   [Note] Assigning an RW_block sampler to nodes with very different scales can result in low MCMC efficiency.  If all nodes assigned to RW_block are not on a similar scale, we recommend providing an informed value for the "propCov" control list argument, or using the AFSS sampler instead.
+```
+
+```r
+littersConf$addSampler(target = c("a[2]", "b[2]"), type = "RW_block",
+    control = list(adaptInterval = 20, adaptFactorExponent = 0.25))
+```
+
+```
+##   [Note] Assigning an RW_block sampler to nodes with very different scales can result in low MCMC efficiency.  If all nodes assigned to RW_block are not on a similar scale, we recommend providing an informed value for the "propCov" control list argument, or using the AFSS sampler instead.
+```
+
+
+
+```r
+littersMCMC &lt;- buildMCMC(littersConf)
+cLittersMCMC &lt;- compileNimble(littersMCMC, project = littersModel,
+    resetFunctions = TRUE)
+
+set.seed(1)
+samplesBlock &lt;- runMCMC(cLittersMCMC, niter = niter, nburnin = nburn,
+    inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+---
+.scroll-box-16[
+
+```r
+effectiveSize(samplesBlock)
+```
+
+```
+##       a[1]       a[2]       b[1]       b[2]    p[1, 1]    p[2, 1]    p[1, 2] 
+##   33.86632  101.41337   35.23315  103.57563   20.82346 1039.82103   19.76178 
+##    p[2, 2]    p[1, 3]    p[2, 3]    p[1, 4]    p[2, 4]    p[1, 5]    p[2, 5] 
+##  815.63917   18.03884  892.16874   18.69189 1094.87731   21.98678 2161.73220 
+##    p[1, 6]    p[2, 6]    p[1, 7]    p[2, 7]    p[1, 8]    p[2, 8]    p[1, 9] 
+##   19.11531 1975.62110   16.10892 3747.76019   16.33471 2442.87438   18.38433 
+##    p[2, 9]   p[1, 10]   p[2, 10]   p[1, 11]   p[2, 11]   p[1, 12]   p[2, 12] 
+## 2613.30847   24.16714 3746.00759   18.48966 3516.05994   22.20508 2128.54971 
+##   p[1, 13]   p[2, 13]   p[1, 14]   p[2, 14]   p[1, 15]   p[2, 15]   p[1, 16] 
+##   20.78863 2135.95273   17.32952 1967.11261   17.11228  989.83726   22.20015 
+##   p[2, 16] 
+##  369.24043
+```
+]
+---
+
+
+```r
+makePlot(samplesBlock)
+```
+
+![](customizing_mcmc_files/figure-html/output-block2-1.png)&lt;!-- --&gt;
+
+The block sampler seems to help some, but hopefully we can do better. Often block sampling gives bigger improvements, but it can be sensitive to how it's configured/initialized.
+
+---
+### NIMBLE
+
+
+**Caveat**: the real question is the effective sample size per unit of computation time (each slice sampler iteration is much slower than each Metropolis iteration), but we didn't assess that in this example.
+
+
+---
+### More resources for comparisons
+
+[`compareMCMCs`](https://github.com/nimble-dev/compareMCMCs) is an R package available on GitHub for managing performance comparisons among MCMC methods, particularly in `nimble`.  
+
+- `compareMCMCs` manages multiple MCMC runs and times steps of preparation (compilation) and sampling.
+
+- It can also run other MCMC "engines" via a plug-in system.  Currently there are plug-ins for JAGS and Stan.  Plug-ins for JAGS and OpenBUGS/WinBUGS (not yet implemented) can use the same model as `nimble` if it is compatible.
+
+- Choice of performance metrics is extensible by a plug-in system.
+
+- It can generate comparison figures. Components included are extensible by a plug-in system.
+
+- It can convert between different parameter names or parameterizations across MCMC engines.
+
+---
+
+### Think like a graph: reducing dependencies
+
+Consider a basic state-space model.
+
+Observation equation: `\(y_t \sim f(y_t | x_t)\)`. 
+State equation: `\(x_t \sim g(x_t | x_{t-1})\)`
+
+Two equivalent ways to write state-space models:
+
+.pull-left[
+1)
+
+```r
+code_heavy &lt;- nimbleCode({
+    for (t in 1:n) {
+        y[t] ~ dnorm(x[t], sd = sigma)
+    }
+    for (t in 2:n) {
+        x[t] &lt;- x[t - 1] + eps[t - 1]
+        eps[t] ~ dnorm(0, sd = omega)
+    }
+})
+```
+Process-noises are random variables.  States are deterministic given process noises. 
+]
+
+.pull-right[
+2) 
+
+```r
+code_light &lt;- nimbleCode({
+    for (t in 1:n) {
+        y[t] ~ dnorm(x[t], sd = sigma)
+    }
+    for (t in 2:n) {
+        x[t] ~ dnorm(x[t - 1], sd = omega)
+    }
+})
+```
+States are random variables.
+]
+
+---
+### Think like a graph: reducing dependencies (2)
+
+
+```r
+n &lt;- 20
+m_heavy &lt;- nimbleModel(code_heavy, data = list(y = rnorm(n)),
+    constants = list(n = n))
+m_light &lt;- nimbleModel(code_light, data = list(y = rnorm(n)),
+    constants = list(n = n))
+```
+
+What calculations are required to update `eps[18]` or `eps[1]` compared to `x[18]` or `x[1]`?
+
+.scroll-box-14[
+
+```r
+m_heavy$getDependencies("eps[18]")
+```
+
+```
+## [1] "eps[18]" "x[19]"   "y[19]"   "x[20]"   "y[20]"
+```
+
+```r
+m_light$getDependencies("x[18]")
+```
+
+```
+## [1] "x[18]" "y[18]" "x[19]"
+```
+
+```r
+m_heavy$getDependencies("eps[1]")
+```
+
+```
+##  [1] "x[2]"  "y[2]"  "x[3]"  "y[3]"  "x[4]"  "y[4]"  "x[5]"  "y[5]"  "x[6]" 
+## [10] "y[6]"  "x[7]"  "y[7]"  "x[8]"  "y[8]"  "x[9]"  "y[9]"  "x[10]" "y[10]"
+## [19] "x[11]" "y[11]" "x[12]" "y[12]" "x[13]" "y[13]" "x[14]" "y[14]" "x[15]"
+## [28] "y[15]" "x[16]" "y[16]" "x[17]" "y[17]" "x[18]" "y[18]" "x[19]" "y[19]"
+## [37] "x[20]" "y[20]"
+```
+
+```r
+m_light$getDependencies("x[1]")
+```
+
+```
+## [1] "y[1]" "x[2]"
+```
+]
+`eps[1]` affects all the `x[t]` values and therefore all the `y[t]` values! 
+---
+### Think like a graph: when to vectorize
+
+Vectorizing some calculations:
+
+- Can make code more compact.
+- Can make model and MCMC building and compiling faster (fewer nodes).
+- Can improve MCMC efficiency, but sometimes not by much (less looping over nodes).
+- Can hurt MCMC efficiency if done in the wrong places (if unneeded dependencies are introduced).
+
+
+```r
+code &lt;- nimbleCode({
+    intercept ~ dnorm(0, sd = 1000)
+    slope ~ dnorm(0, sd = 1000)
+    sigma ~ dunif(0, 100)
+    predicted.y[1:4] &lt;- intercept + slope * x[1:4]  # vectorized node
+    for (i in 1:4) {
+        y[i] ~ dnorm(predicted.y[i], sd = sigma)
+    }
+})
+model &lt;- nimbleModel(code, data = list(y = rnorm(4)))
+```
+
+---
+
+```r
+model$getDependencies("slope")
+```
+
+```
+## [1] "slope"            "predicted.y[1:4]" "y[1]"             "y[2]"            
+## [5] "y[3]"             "y[4]"
+```
+ 
+Here sampling of `slope` (and `intercept`) will probably be a bit more efficient because of the vectorized definition of `predicted.y`, since all observations depend on `slope` (and `intercept`). 
+
+We avoid some overhead by having one `predicted.y[1:4]` node rather than four `predicted.y[1], ..., predicted.y[4]` nodes.
+
+Another (manual) step would be to create a user-defined vectorized `dnorm` distribution so `y[1:4]` is a vector node. 
+
+---
+### Think like a graph: when not to vectorize
+
+However, if `x[2]` (and the other 'x's) were a scalar parameter (in this case a random effect), vectorization is likely a bad idea. Any update for `x[2]` will calculate `predicted.y[1:4]` and `y[1],...,y[4]` when only `predicted.y[2]` and `y[2]` need to be calculated.
+
+
+```r
+code &lt;- nimbleCode({
+    intercept ~ dnorm(0, sd = 1000)
+    slope ~ dnorm(0, sd = 1000)
+    sigma ~ dunif(0, 100)
+    predicted.y[1:4] &lt;- intercept + slope * x[1:4]  # vectorized node
+    for (i in 1:4) {
+        x[i] ~ dnorm(0, 1)  # scalar random effects
+        y[i] ~ dnorm(predicted.y[i], sd = sigma)
+    }
+})
+model &lt;- nimbleModel(code, data = list(y = rnorm(4)))
+```
+
+
+```r
+model$getDependencies("x[2]")
+```
+
+```
+## [1] "x[2]"             "predicted.y[1:4]" "y[1]"             "y[2]"            
+## [5] "y[3]"             "y[4]"
+```
+In this case, vectorization has made more dependencies for `x[2]` than should be necessary.  This would result in wasted computation during MCMC sampling.
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightSpans": true,
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
