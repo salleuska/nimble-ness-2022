@@ -7,7 +7,7 @@ To prepare for the workshop:
  - Install additional packages (see below)
  - Download these materials (and check back before the workshop on Monday May 23 for updates)
 
-All materials for the workshop will be in this GitHub repository. If you're familiar with Git/GitHub, you already know how to get all the materials on your computer. If you're not, simply click [here](https://github.com/nimble-training/nimble-ness-2022/archive/main.zip).
+All materials for the workshop will be in this GitHub repository. If you're familiar with Git/GitHub, you already know how to get all the materials on your computer. If you're not, simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip).
 
 <!--
  There is some overview information [here (https://htmlpreview.github.io/?https://github.com/nimble-training/nimble-lisbon-2022/blob/main/overview.html), including links to the content modules in order.
