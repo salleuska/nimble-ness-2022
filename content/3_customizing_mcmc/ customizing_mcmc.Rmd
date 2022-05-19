@@ -1,5 +1,5 @@
 ---
-  title: "Customizing an MCMC`"
+title: "Customizing an MCMC`"
 subtitle: "NIMBLE NESS 2022 short course"
 author: "NIMBLE Development Team"
 date: "May 2022"
@@ -8,12 +8,15 @@ date: "May 2022"
 #   beamer_presentation: default
 output:
   xaringan::moon_reader:
-  lib_dir: libs
-nature:
-  highlightStyle: github
-highlightLines: true
-countIncrementalSlides: false
+    css: [default, tamu-fonts, mystyle.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightSpans: true
+      highlightLines: true
+      countIncrementalSlides: false
 ---
+
 
 ```{r chunksetup, include=FALSE} 
 # include any code here you don't want to show up in the document,

@@ -8,7 +8,7 @@ date: "May 2022"
 #   beamer_presentation: default
 output:
   xaringan::moon_reader:
-    css: [default, tamu-fonts]
+    css: [default, tamu-fonts, mystyle.css]
     lib_dir: libs
     nature:
       highlightStyle: github
@@ -31,6 +31,119 @@ ggplot2::theme_set(theme_bw())
 
 ```
 
+
+# NIMBLE models: some concepts
+
+### Models are graphs
+
+- Scientists in many application domains and many statisticians speak of "hierarchical models".
+- Computer scientists and others sometimes speak of "graphical models".
+- A hierarchical model is typically a directed acyclic graph (DAG).
+
+--
+
+### Models are objects
+
+When you create a NIMBLE model, it is an object in R. You can:
+
+ - Get or set parameter or data values.
+ - Determine graph relationships.
+ - Calculate log probabilities.
+ - Simulate (draw) from distributions.
+ - More.
+ 
+---
+### Linear regression example
+
+Let's use a really simple model:
+
+- Linear regression with 4 data points.
+
+```{r}
+set.seed(1)
+code <- nimbleCode({
+  intercept ~ dnorm(0, sd = 1000)
+  slope ~ dnorm(0, sd = 1000)
+  sigma ~ dunif(0, 100)
+  for(i in 1:4) {
+    predicted.y[i] <- intercept + slope * x[i]
+    y[i] ~ dnorm(predicted.y[i], sd = sigma)
+  }
+})
+model <- nimbleModel(code, 
+                     data = list(y = rnorm(4)),
+                     inits = list(intercept = 0.5, 
+                                  slope = 0.2, 
+                                  sigma = 1,
+                                  x = c(0.1, 0.2, 0.3, 0.4)))
+```
+
+`x` values are neither observations ('data') nor parameters. `x` can also be provided in `constants` (this is generally best, unless you plan to change `x`) or in `data` (for consistency with WinBUGS/JAGS).
+
+---
+### Draw the graph
+
+
+```{r, linmodel-graph, echo = FALSE, fig.width=10, fig.height=6, dpi = 300, fig.show=FALSE}
+
+layout <- matrix(ncol = 2, byrow = TRUE,
+   # These seem to be rescaled to fit in the plot area,
+   # so I'll just use 0-100 as the scale
+                 data = c(33, 100,
+                          66, 100,
+                          50, 0, # first three are parameters
+                          15, 50, 35, 50, 55, 50, 75, 50, # x's
+                          20, 75, 40, 75, 60, 75, 80, 75, # predicted.y's
+                          25, 25, 45, 25, 65, 25, 85, 25) # y's
+                 )
+sizes <- c(45, 30, 30,
+           rep(20, 4),
+           rep(50, 4),
+           rep(20, 4))
+
+edge.color <- "black"
+stoch.color <- "#b0d5ff"
+det.color <- "#ff969f"
+rhs.color <- "#bbf29b"
+fill.color <- c(
+    rep(stoch.color, 3),
+    rep(rhs.color, 4),
+    rep(det.color, 4),
+    rep(stoch.color, 4)
+)
+
+par(mar=c(0,0,0,0)+.1)
+plot(model$graph, vertex.shape = "crectangle",
+     vertex.size = sizes,
+     vertex.size2 = 20,
+     layout = layout,
+     vertex.label.cex = 1.0,
+     vertex.color = fill.color,
+     edge.width = 3,
+     asp = 0.5,
+     edge.color = edge.color)
+```
+
+
+
+- Think of each line of BUGS language code as declaring one or mode *nodes*.
+- The graph is stored inside the nimble model object (`model$graph`)
+
+---
+### Some definitions
+
+The parameters and data in a model are represented as nodes in a graph. Here we define some terms:
+  
+- **parameter**: an unknown quantity in the model that is represented as a random variable and will generally be estimated in an algorithm, e.g. `intercept` in the linear model above
+- **data**: a known quantity in a model, also represented as a random variable, e.g., `y[1], ..., y[1], ...` in the linear model
+- **constants**: other fixed quantities involved in the model, e.g., the number of observations
+- **node**: an element in the model graph representing data, parameter, or a deterministic quantity that is a function of other quantities in the model, e.g., `predicted.y[1]`, `predicted.y[2]`, in the linear model
+  - nodes can be univariate or multivariate depending on whether they are defined based on a univariate or multivariate density (or scalar or vectorized assignment for deterministic nodes)
+- **variable**: a collection of one or more nodes with the same name, e.g., `predicted.y` or `y`in the linear model. 
+
+---
+
+
 # NIMBLE models: language
 
 ### How NIMBLE is the same as BUGS and JAGS
@@ -48,7 +161,7 @@ ggplot2::theme_set(theme_bw())
 See our [guide online](https://r-nimble.org/quick-guide-for-converting-from-jags-or-bugs-to-nimble).
 
 ---
-# How NIMBLE extends BUGS
+### How NIMBLE extends BUGS
 
   - Alternative distribution parameterizations (like R).
   - Named parameters (like R).
@@ -64,7 +177,7 @@ NIMBLE is stricter about requiring square brackets and
 
 ---
 
-# R-like alternative and named parameters
+## R-like alternative and named parameters
 
 ```{r, litters-model-param, eval=FALSE}
 
@@ -83,11 +196,11 @@ littersCode <- nimbleCode({
 })
 ```
 
-Note that we could have used the mean/sd parameterization of the beta distribution, which would then require different hyperparameter specification.
+Note that we could use the mean/sd parameterization of the beta distribution, which would then require different hyperparameter specification.
 
 ---
 
-# R-like alternative and named parameters
+## R-like alternative and named parameters
 
 - BUGS/JAGS: Only `dnorm(mu, tau)` is supported, where `tau` is precision.
 - NIMBLE: Alternative parameterizations and named parameters are supported:
@@ -115,21 +228,21 @@ Note that we could have used the mean/sd parameterization of the beta distributi
 
 ---
 
-Here's an example:
+Here's an example using the litters model:
 
-```{r, data-example, eval=TRUE, echo=FALSE}
+```{r, data-example, eval=TRUE, echo=FALSE, results = 'hide', message=FALSE}
 if(!exists('littersModel'))
    source(file.path("..", "examples", "chunks_litters.R"),  chdir = TRUE)
 ```
 
-
+.scroll-box-16[
 ```{r, data-example 2}
 littersModel$isData('r')
 littersModel$isData('p')
 littersModel$r
 littersModel$p
 ```
-
+]
 ---
 Data values are protected from simulation unless you are sure you want to simulate those 
 
@@ -169,7 +282,6 @@ littersModel$r
 
 ---
 ### More explicit need to provide dimensions 
-### (in models, not in nimbleFunctions)
 
 - Square brackets must always be provided to indicate number of dimensions
 
@@ -184,7 +296,7 @@ littersModel$r
 
 ---
 
-# Vectorized math and linear algebra
+### Vectorized math and linear algebra
 
 Instead of writing this in your model code:
 
@@ -207,9 +319,12 @@ m2 <- nimbleModel(
     ))
 ```
 
+`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` The two models are are not equivalent
+
 ---
 
-`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` They are not equivalent:
+`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` The two models are are not equivalent
+
 
 ```{r, vectorized-3}
 ## m1 has 5 scalar nodes
@@ -240,7 +355,7 @@ x[1:5] <- (A[1:5, 1:5] %*% b[1:5] + c[1:5])[,1]
 ```
 
 ---
-# Definition-time if-then-else
+## Definition-time if-then-else
 
   - If you wish to define multiple alternative models in one set of code,
   you can use if-then-else statements.  
@@ -250,10 +365,9 @@ x[1:5] <- (A[1:5, 1:5] %*% b[1:5] + c[1:5])[,1]
   - **You cannot use if statements as statements within model code apart from this usage of defining alternative models.**
 
 ---
-# Definition-time if-then-else
+## Definition-time if-then-else
 
 For example:
-
 ```{r if-then-else}
 code <- nimbleCode({
     sigma ~ dunif(0, 10)
@@ -274,193 +388,279 @@ m1 <- nimbleModel(code)
 INCLUDE_X2 <- TRUE
 m2 <- nimbleModel(code)
 ```
-
-```{r if-then-else 2, results='hide'}
+---
+.scroll-box-20[
+```{r if-then-else 2}
 m1$getNodeNames()
 m2$getNodeNames()
-
 ```
+]
 
 m2 has `beta2` while m1 does not.  The long names are "lifted nodes" -- more on those later.
 
 ---
+### Models as objects: operating the model
 
-# NIMBLE models: operating with models
+Now let's explore how to understand the dependence structure of a model. The model is a directed acyclic graph, after all, so we should be able to work with that graph structure.
 
-### Models are graphs
+We'll work with a different parameterization of the beta distribution to be able to illustrate additional concepts.
 
-- Scientists in many application domains and many statisticians speak of "hierarchical models".
-- Computer scientists and others sometimes speak of "graphical models".
-- A hierarchical model is typically a directed acyclic graph (DAG).
-
---
-
-### Models are objects
-
-When you create a NIMBLE model, it is an object in R. You can:
-
- - Get or set parameter or data values.
- - Determine graph relationships.
- - Calculate log probabilities.
- - Simulate (draw) from distributions.
- - More.
- 
----
-# Linear regression example
-
-Let's use a really simple model:
-
-- Linear regression with 4 data points.
-
-```{r}
-set.seed(1)
-code <- nimbleCode({
-  intercept ~ dnorm(0, sd = 1000)
-  slope ~ dnorm(0, sd = 1000)
-  sigma ~ dunif(0, 100)
-  for(i in 1:4) {
-    predicted.y[i] <- intercept + slope * x[i]
-    y[i] ~ dnorm(predicted.y[i], sd = sigma)
-  }
+```{r, litters-reparam-code}
+littersCode <- nimbleCode({
+  for (i in 1:G) {
+     for (j in 1:N) {
+        # likelihood (data model)
+        r[i,j] ~ dbin(p[i,j], n[i,j])
+        # latent process (random effects)
+        # note use of alternative parameterization and named parameters
+        p[i,j] ~ dbeta(mean = mu[i], sd = sigma[i])
+     }
+     # prior for hyperparameters
+     mu[i] ~ dflat()
+     sigma[i] ~ dunif(0, 100)
+   }
 })
-model <- nimbleModel(code, 
-                     data = list(y = rnorm(4)),
-                     inits = list(intercept = 0.5, 
-                                  slope = 0.2, 
-                                  sigma = 1,
-                                  x = c(0.1, 0.2, 0.3, 0.4)))
 ```
-
-`x` values are neither observations ('data') nor parameters. `x` can also be provided in `constants` (this is generally best, unless you plan to change `x`) or in `data` (for consistency with WinBUGS/JAGS).
-
----
-## Draw the graph
-
-```{r, linmodel-graph, results ='hide', echo = FALSE, fig.width=10, fig.height=10}
-
-layout <- matrix(ncol = 2, byrow = TRUE,
-   # These seem to be rescaled to fit in the plot area,
-   # so I'll just use 0-100 as the scale
-                 data = c(33, 100,
-                          66, 100,
-                          50, 0, # first three are parameters
-                          15, 50, 35, 50, 55, 50, 75, 50, # x's
-                          20, 75, 40, 75, 60, 75, 80, 75, # predicted.y's
-                          25, 25, 45, 25, 65, 25, 85, 25) # y's
-                 )
-
-sizes <- c(45, 30, 30,
-           rep(20, 4),
-           rep(50, 4),
-           rep(20, 4))
-
-edge.color <- "black"
-stoch.color <- "skyblue1"
-det.color <- "lightsalmon"
-rhs.color <- "aliceblue"
-fill.color <- c(
-    rep(stoch.color, 3),
-    rep(rhs.color, 4),
-    rep(det.color, 4),
-    rep(stoch.color, 4)
-)
-
-par(mar=c(0,0,0,0)+.1)
-plot(model$graph, vertex.shape = "crectangle",
-     vertex.size = sizes,
-     vertex.size2 = 20,
-     layout = layout,
-     vertex.label.cex = 1.0,
-     vertex.color = fill.color,
-     edge.width = 3,
-     asp = 0.5,
-     edge.color = edge.color)
-```
-
-
-![](`r knitr::fig_chunk("linmodel-graph", "png")`)
-
-- Think of each line of BUGS language code as declaring one or mode *nodes*.
-
 
 ---
 
-### Operating the models: values in the model
+```{r, litters-setup}
+G <- 2
+N <- 16
+n <- matrix(c(13, 12, 12, 11, 9, 10, 
+              9, 9, 8, 11, 8, 10, 13, 10, 12, 9, 10, 9, 10, 5, 9, 9, 13, 
+              7, 5, 10, 7, 6, 10, 10, 10, 7), nrow = 2)
+r <- matrix(c(13, 12, 12, 11, 9, 10, 9, 9, 8, 10, 8, 9, 
+     12, 9, 11, 8, 9, 8, 9, 4, 8, 7, 11, 4, 4, 5, 5, 3, 7, 3, 7, 0), 
+     nrow = 2)
+              
+littersConsts <- list(G = G, N = N, n = n)
+littersData <- list(r = r)
+littersInits <- list(mu = rep(0.5, 2), sigma = rep(1, 2))
 
-What's the current value in a variable?
+## create the NIMBLE model object
+model <- nimbleModel(littersCode, 
+          data = littersData, constants = littersConsts, inits = littersInits)
+```
 
+---
 
+### Models as objects: operating the model
+
+NIMBLE provides users and programmers with the ability to get information about the nodes and variables in the model and the relationships among them.
+We can use NIMBLE to ask questions such as: 
+ - What's the current value in a variable?
+
+.scroll-box-8[
 ```{r, model-values}
-littersModel$r  
-littersModel$a[1]
-littersModel$p
+model$r  
+model$mu[1]
+model$p
 ```
-
----
+]
 
 Setting values:
 
+.scroll-box-8[
 ```{r, model-set-values}
-littersModel$a[1] <- 5
-littersModel$a
+model$mu[1] <- 1
+model$mu
+```
+]
+
+---
+### Querying nodes and variables
+
+  - What are the nodes in the model?
+  - What are the dependencies of a given node? Note that this is information used in many algorithms.
+
+```{r, model-nodes}
+
+nodes <- model$getNodeNames()
+nodes[1:11]
+top <- model$getNodeNames(topOnly = TRUE)
+top
+muDeps <- model$getDependencies('mu')
+muDeps[1:11]
+
 ```
 
 ---
+### Querying nodes and variables
 
+  - What are data nodes? 
+.scroll-box-20[
+```{r, model-data}
+model$getNodeNames(dataOnly = TRUE)
+model$isData('r')
+## parameters (including imputed data)
+model$getNodeNames(stochOnly = TRUE, includeData = FALSE)
+```
+
+]
+---
+
+### More details
+
+There are a variety of options to `getNodeNames()` and `getDependencies` that allow you to fine-tune the information you get.
+
+.scroll-box-8[
+```{r, get-info}
+args(model$getDependencies)
+args(model$getNodeNames)
+```
+]
+
+.scroll-box-8[
+```{r, get-info2}
+latents <- model$getNodeNames(latentOnly = TRUE, stochOnly = TRUE,
+                              includeData = FALSE)
+latents
+model$getDependencies(latents, dataOnly = TRUE)
+model$getNodeNames(dataOnly = TRUE)
+```
+]
+---
+### Querying nodes and variables
+
+- What are the variables in the model? What information is available about them?
+  
+```{r, model-vars}
+model$getVarNames()
+model$getVarInfo('mu')
+
+```
+
+As of the current version of NIMBLE, information about
+variables is not competely nicely arranged for a user (there aren't as
+many query functions), but it is available.
+
+This variable has 1 dimension (`nDim`), and its size is 2 (`maxs`).  Currently `mins` is always 1.  If at least one node within the variable is stochastic, then `anyStoch` will be `TRUE`.
+
+---
 ### Operating the model: *simulate()*
  
 We have control over the model. In particular, for every node, NIMBLE provides **`calculate()`** and **`simulate()`** functions that calculate the current probability density value for the node and simulate a new value for the node from its (prior) distribution (i.e., given only parent nodes). These operations lie at the heart of many algorithms.
 
 **`simulate()`** puts new values into the model; if you want to see those values, you need to look into the model.
-.scroll-output[
+
+.scroll-box-12[
 ```{r, model-simulate}
 set.seed(1)  # so the calculations are reproducible
-littersModel$simulate('p')  # simulate from prior
-littersModel$p
-littersModel$getLogProb('p')  # log prob not yet updated!
-littersModel$calculate('p')   # update it
-littersModel$getLogProb('p')  # now we're good
+model$simulate('p')  # simulate from prior
+model$p
+model$getLogProb('p')  # log prob not yet updated!
+model$calculate('p')   # update it
+model$getLogProb('p')  # now we're good
 ```
 ]
 ---
 
-# Operating the model: *calculate()* 
+### Operating the model: *calculate()* 
 
-Let's change values in the model and recalculate the density values. NIMBLE sometimes introduces hidden nodes not specified in the model, so when calculating model density values, it's best to ask NIMBLE to do so based on the dependencies of the altered node.
+Let's change values in the model and recalculate the density values.
+
+- NIMBLE sometimes introduces *hidden nodes* (remember those lifted nodes?) not specified in the model, 
+
+- When calculating model density values, it's best to ask NIMBLE to do so based on the dependencies of the altered node.
 
 ```{r, model-operate}
-littersModel$getLogProb('p')
-littersModel$a[1] <- 1
-littersModel$b[1] <- 3
-littersModel$getLogProb('p')  # recall why this hasn't changed yet
+model$getLogProb('p')
+model$mu[1] <- 0.3
+model$sigma[1] <- 1
 
-## DON'T DO THIS! (though it's ok to do here...)
-## littersModel$calculate('p')
-
-## INSTEAD DO THIS
-deps <- littersModel$getDependencies(c('a[1]','b[1]'))
-littersModel$calculate(deps)
-
-## alternatively, we could just update the entire model to be safe:
-## littersModel$calculate()
-
-## now that model state is updated, can ask for logProbs
-littersModel$getLogProb('p')
+model$getLogProb('p')  
+# recall why this hasn't changed yet?
 ```
 
-
-
----
-### Small recap
-
- - **data**: a known quantity in a model, also represented as a random variable, e.g., `r[1,1], r[1,2], ...` in the litters model
- 
- - **constants**: other fixed quantities involved in the model, e.g., `N` in the litters model
- 
- - **node**: an element in the model graph representing data, parameter, or a deterministic quantity that is a function of other quantities in the model, e.g. `a[1]`, `a[2]`, and `r[1, 2]` in the litters model
-    - nodes can be univariate or multivariate depending on whether they ae defined based on a joint (multivariate) density or joint assignment
-    
- - **variable**: a collection of one or more nodes with the same name, e.g., 'a' or 'r' in the litters model
- 
 ---
 
+### Operating the model: *calculate()* 
+
+```{r, model-operate 2}
+
+## DON'T DO THIS! (though it's ok to do here...)
+## model$calculate('p')
+
+## INSTEAD DO THIS
+deps <- model$getDependencies(c('mu[1]','sigma[1]'))
+model$calculate(deps)
+
+## alternatively, we could just update the entire model to be safe:
+## model$calculate()
+
+## now that model state is updated, can ask for logProbs
+model$getLogProb('p')
+```
+
+---
+### The importance of querying a model: lifted nodes
+
+You will have noticed a few strangely-named nodes, such as `lifted_mu_oBi_cB_tothe_2_times....`, in the model.
+
+NIMBLE implements some features by inserting its own nodes. In this case we reparameterize the model from the mean/sd parameterization of a beta distribution to the shape1/shape2 parameterization, and `lifted_mu_oBi_cB_tothe_2_times....` is the first shape parameter of the beta distribution for the first group.
+
+**You should never assume you know what nodes are in a model simply because you wrote the model code.**
+
+---
+
+Let's look at the two main ways this happens:
+                                                         
+```{r, lifted-1, fig.cap=""}
+ code <- nimbleCode({
+   mu ~ dnorm(0, sd = 10)
+   tau ~ dunif(0, 100)
+   x ~ dnorm(mu, tau) #by default, tau is a precision
+ })
+ 
+ 
+ m1 <- nimbleModel(code, data = list(x = 2.5), inits = list(mu = 0, tau = 1))
+ 
+ par(mfrow = c(1,1))
+ plot(m1$getGraph())
+ m1$getNodeNames()
+```
+                                                       
+The node `lifted_d1_over_sqrt_oPtau_cP` has been inserted between `tau` and `x`.   The resulting model would equivalently have been created by this model code:
+                                                         
+```{r, lifted-2, eval = FALSE}
+nimbleCode({
+  mu ~ dnorm(0, sd = 10)
+  tau ~ dunif(0, 100)
+  lifted_d1_over_sqrt_oPtau_cP <- 1/sqrt(tau)
+  x ~ dnorm(0, sd = lifted_d1_over_sqrt_oPtau_cP) # override and make 2nd arg the SD
+})
+```
+
+---
+NIMBLE has *lifted* the calculation of standard deviation from precision so that it is part of the model's graph.  Therefore *you
+will make a mistake if you assume that the dependencies of `tau`
+include only `x`*:
+
+```{r, bad}
+m1$tau                     ## Original value of tau
+m1$getParam('x', 'sd')     ## Original value of sd based on tau
+m1$tau <- 16
+m1$x <- 1
+m1$calculate('x') ## Wrong: the lifted node is being neglected
+m1$getParam('x', 'sd')     ## Verifying the sd is not up to date.
+```
+
+---
+# The importance of querying a model: model-generic programming
+
+Instead we need to ask NIMBLE for the dependencies of any nodes that have changed and use *model-generic* programming:
+
+.scroll-box-14[
+```{r, model-generic}
+deps <- m1$getDependencies('tau')
+m1$tau <- 16
+m1$x <- 1
+m1$calculate(deps)    ## Correct: the lifted node is updated too
+deps
+m1$getLogProb('x')
+m1$getParam('x', 'sd')  ## Verifying the sd is up to date
+```
+]
+
+So the call to *calculate* causes the lifted node to get updated and then calculates the log probability density for *x*.

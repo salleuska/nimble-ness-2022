@@ -12,6 +12,11 @@ littersCode <- nimbleCode({
      # prior for hyperparameters
      a[i] ~ dgamma(1, .001)
      b[i] ~ dgamma(1, .001)
+
+     ## Mean and dispersion
+     mu[i] <- a[i] / (a[i] + b[i])
+     theta[i] <- 1 / (a[i] + b[i])
+
    }
 })
 

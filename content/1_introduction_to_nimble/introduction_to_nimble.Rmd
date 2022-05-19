@@ -8,16 +8,19 @@ date: "May 2022"
 #   beamer_presentation: default
 output:
   xaringan::moon_reader:
+    css: [default, tamu-fonts, mystyle.css]
     lib_dir: libs
     nature:
       highlightStyle: github
+      highlightSpans: true
       highlightLines: true
       countIncrementalSlides: false
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      cache = FALSE)
+                      cache = TRUE)
 has_ggplot2 <- require(ggplot2)
 has_mcmcplots <- require(mcmcplots)
 has_coda <- require(coda)
@@ -27,10 +30,29 @@ ggplot2::theme_set(theme_bw())
 knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 ```
 
+### Acknowledgements
+
+.pull-left[
+![](perry.jpg)
+
+Perry de Valpine
+(UC Berkeley)
+]
+
+.pull-right[
+![](chris.jpg)
+
+
+Chris Paciorek
+(UC Berkeley)
+]
+
+---
 # What Is NIMBLE?
 
-**N**umerical **I**nference for statistical **M**odels using **B**ayesian and **L**ikelihood **E**stimation.
---
+**N**umerical **I**nference for statistical **M**odels using 
+**B**ayesian and **L**ikelihood **E**stimation.
+
 .pull-left[
 ![](nimble-icon.png)
 ]
@@ -118,18 +140,44 @@ We'll use the *litters* model example from BUGS. The data set describes survival
 
   - There are `G=2` groups of rat litters, with `N=16` litters (i.e., mothers) in each group, and a variable number of pups in each litter.
 
+  - We observe the number of rat pups who survived `r[i,j]` among `n[i,j]`
+  
   - Survival of the pups in a litter is governed by a survival probability for each litter, `p[i,j]`.
-  
-  - The probabilities for the litters within a group are considered to come from a common distribution, thereby borrowing strength across the litters in a group.
-  
-  - The common distributions are $p_{1,j} \sim \mbox{Beta}(a_1, b_1)$ for group 1 and $p_{2,j} \sim \mbox{Beta}(a_2, b_2)$ for group 2.
-
 
 ---
-
 ## Specifying the code for a model
 
-Here we specify the litters code directly in R. We can walk through some of details via the comments in the BUGS code. The model is a binomial GLMM with $G=2$ groups of rat litters, and exchangeable litter-specific survival probabilities for the litters in each group. 
+Model for the data: the probabilities for the litters within a group are considered to come from a common distribution, thereby borrowing strength across the litters in a group.
+
+
+\begin{align}
+  r_{ij} &\sim \mbox{Bin}(n_{ij}, p_{ij}), \quad i = 1, 2,\quad  j = 1, \ldots, N \\
+  p_{1,j} &\sim \mbox{Beta}(a_1, b_1), \quad j = 1, \ldots, N \\
+  p_{2,j} &\sim \mbox{Beta}(a_2, b_2), \quad j = 1, \ldots, N
+\end{align}
+
+
+Priors:
+$$
+  a_i \sim Gamma(1, 0.001),\quad  b_i \sim Gamma(1, 0.001),\quad i = 1, 2
+$$
+Other quantities of interest: 
+- mean $\mu_i = a_i/(a_i + b_i)$ 
+- dispersion $\theta_i = 1/(a_i + b_i)$ 
+
+---
+## Specifying the code for a model
+
+
+```{r echo = FALSE, out.width="500px", fig.align='center'}
+knitr::include_graphics("litters_DAG.png")
+
+```
+
+---
+## Specifying the code for a model
+
+We can walk through some of details via the comments in the BUGS code. The model is a binomial GLMM with $G=2$ groups of rats litters, and exchangeable litter-specific survival probabilities for the litters in each group. 
 
 ```{r, litters-code}
 library(nimble)
@@ -141,10 +189,12 @@ littersCode <- nimbleCode({
         # Latent process (random effects)
         p[i,j] ~ dbeta(a[i], b[i]) 
      }
-     # Priors for hyperparameters 
-     # (this parameterization not recommended)
+     # Priors for hyperparameters (not reccomended)
      a[i] ~ dgamma(1, .001)
      b[i] ~ dgamma(1, .001)
+     ## Mean and dispersion reparameterization
+     mu[i] <- a[i] / (a[i] + b[i])
+     theta[i] <- 1 / (a[i] + b[i])
    }
 })
 ```
@@ -152,7 +202,8 @@ littersCode <- nimbleCode({
 You can also load it directly from the standard BUGS example file formats (see `help(readBUGSmodel)`).
 
 ---
-# Build the model
+## Build the model
+
 
 ```{r, message=FALSE}
 ## data and constants as R objects
@@ -173,17 +224,16 @@ littersInits <- list(a = c(2, 2), b = c(2, 2))
 
 ---
 
-
+.scroll-box-20[
 ```{r, message = TRUE}
 ## create the NIMBLE model object
 littersModel <- nimbleModel(littersCode, 
           data = littersData, constants = littersConsts, inits = littersInits)
 ```
-
-If all you want to do is run an MCMC, NIMBLE's fine-grained control might not be so interesting to you, in which case you can just use `nimbleMCMC()` without using `nimbleModel()` to create the model. But by providing an explicit model object, we allow you to operate the model and program with it.
+]
 
 ---
-# Compiling a model
+## Compiling a model
 
 In general, you'll want a version of the model that allows for fast computation (this can then be used by any algorithms you use on the model).
 
@@ -193,36 +243,14 @@ To create a fast compiled version of the model, you simply do this.
 cLittersModel <- compileNimble(littersModel)
 ```
 ---
-# Operating a model
 
-You can view and manipulate the values of variables in the model, and calculate (prior or likelihood) densities and simulate from the prior or likelihood in a model.
-
-(Note that the initial NA values for *p* explain the earlier message about the model not being fully initialized.)
-
-```{r operate-model, results = 'hide'}
-cLittersModel$p
-cLittersModel$calculate('a')   # log-prior density
-cLittersModel$getLogProb('a')
-
-cLittersModel$a <- c(3, 3)
-cLittersModel$calculate('a')   # updated log-prior density
-
-set.seed(1)  # so the calculations are reproducible
-littersModel$simulate('p')  # simulate from prior
-littersModel$p
-littersModel$getLogProb('p')  # log prob not yet updated!
-littersModel$calculate('p')   # update it
-littersModel$getLogProb('p')  # now we're good
-```
-
----
-# Setting up an MCMC such that it could be customized
+## Setting up an MCMC such that it could be customized
 
 Much of the power of NIMBLE comes from the ability to **customize algorithms**, including how MCMC sampling works.
 
-In order to talk about MCMC customization later today, we first need to see the 'manual' steps of running an MCMC in NIMBLE (as a contrast to the one-click MCMC mentioned in a previous slide).
+In order to talk about MCMC customization later today, we first need to see the 'manual' steps of running an MCMC in NIMBLE 
 
-The steps of running an MCMC are as follows:
+[NIMBLE workflow](workflow.png):
 
  1. configure the MCMC (via `configureMCMC()`)
  2. build the MCMC (via `buildMCMC()`)
@@ -233,7 +261,7 @@ The steps of running an MCMC are as follows:
 Note that `nimbleMCMC()` combines steps 1-4 (and in fact does not even require you to create the model). See the last slide.
 
 ---
-# Configuring a basic MCMC
+## Configuring a basic MCMC
 
 At a high level, NIMBLE (like BUGS and JAGS) uses a "Gibbs" style MCMC that loops over parameters.
 
@@ -257,7 +285,7 @@ littersConf$addMonitors(c('a', 'b', 'p'))
 
 ---
 
-# Building the MCMC algorithm for the model 
+## Building the MCMC algorithm for the model 
 
 Next we'll build the MCMC algorithm for the model under the default configuration. And we'll create a compiled (i.e., C++) version of the MCMC that is equivalent in functionality but will run much faster.
 
@@ -266,14 +294,14 @@ littersMCMC <- buildMCMC(littersConf)
 cLittersMCMC <- compileNimble(littersMCMC, project = littersModel)
 ```
 
-(The *project* argument helps us manage all the C++ that is generated for a given analysis. In general the project can be referenced using the name of the original (uncompiled) model.)
+(The `project` argument helps us manage all the C++ that is generated for a given analysis. In general the project can be referenced using the name of the original (uncompiled) model.)
 
 ---
 
 # Running the MCMC
 
 Now let's run the MCMC.
-
+.scroll-box-14[
 ```{r run-mcmc}
 niter <- 5000
 nburn <- 1000
@@ -289,12 +317,13 @@ samples <- runMCMC(cLittersMCMC, niter = niter,
                    inits = inits,
                    nchains = 3, samplesAsCodaMCMC = TRUE)
 ```
+]
 
-Sidenote: We don't recommend running the R version of the MCMC for very many iterations - it's really slow - in part because iterating in R is slow and in part because iterating with a model in NIMBLE requires even more overhead. The R and C MCMC samples are the same, so you can use the R MCMC for debugging. It's possible to step through the code line by line using R's debugging capabilities (not shown).
+**Side note**: We don't recommend running the R version of the MCMC for very many iterations in part because iterating in R is slow and in part because iterating with a model in NIMBLE requires even more overhead. The R and C MCMC samples are the same, so you can use the R MCMC for debugging. It's possible to step through the code line by line using R's debugging capabilities (not shown).
 
 ---
 
-# Working with MCMC output
+## Working with MCMC output
 
 Now let's look at the MCMC performance from one of the chains.
 
@@ -319,7 +348,7 @@ ts.plot(samples1[ , 'b[2]'], xlab = 'iteration',
 Not good. We'll explore different sampling strategies that fix the problems in later modules.
 
 ---
-# Using CODA
+## Using CODA
 
 NIMBLE does not provide any MCMC diagnostics. (At least not yet; there's no reason one couldn't write code for various diagnostics using the NIMBLE system.)  But one can easily use CODA or other R packages with the MCMC output from a NIMBLE MCMC.
 
@@ -331,28 +360,36 @@ head(effectiveSize(samples1))  ## ESS
 ```
 
 ---
-# Assessing MCMC performance from multiple chains
+## Assessing MCMC performance from multiple chains
 
 To apply the commonly used Gelman-Rubin potential scale reduction factor diagnostic, we'll need the multiple chains.
 
-```{r}
-head(gelman.diag(samples))
-```
+The Gelman–Rubin diagnostic evaluates MCMC convergence by analyzing the difference between multiple Markov chains. The convergence is assessed by comparing the estimated between-chains and within-chain variances for each model parameter (values close to 1 are good).
 
+.scroll-box-16[
+```{r}
+gelman.diag(samples)
+```
+]
 ---
 
 ```{r gelman-rubin, fig.cap='', fig.height=6, fig.width=12, fig.show="hide" }
-par(mfrow = c(1,1))
 ## and here's a graphical representation of the information
 par(mfrow = c(1, 2))
+
 ts.plot(samples[[1]][ , 'a[1]'], xlab = 'iteration',
      ylab = expression(a[1]), main = expression(a[1]))
+
 sq <- seq_along(samples[[1]][ , 'a[1]'])
+
 for(i in 2:3)
       lines(sq, samples[[i]][ , 'a[1]'], col = i)
+
 ts.plot(samples[[1]][ , 'b[1]'], xlab = 'iteration',
      ylab = expression(b[1]), main = expression(b[1]))
+
 sq <- seq_along(samples[[1]][ , 'b[1]'])
+
 for(i in 2:3)
       lines(sq, samples[[i]][ , 'b[1]'], col = i)
 ```
@@ -362,7 +399,7 @@ for(i in 2:3)
 
 ---
 
-# Other MCMC tools in NIMBLE
+## Other MCMC tools in NIMBLE
 
   - WAIC for model comparison
 
@@ -374,8 +411,11 @@ for(i in 2:3)
 
 ---
 
-# One-click MCMC operation: `nimbleMCMC`
+## One-click MCMC operation: `nimbleMCMC`
 
+If all you want to do is run an MCMC, NIMBLE's fine-grained control might not be so interesting to you, in which case you can just use `nimbleMCMC()` without using `nimbleModel()` to create the model. But by providing an explicit model object, we allow you to operate the model and program with it (next module).
+
+.scroll-box-20[
 ```{r}
 samples <- nimbleMCMC(code = littersCode, 
                       data = littersData, 
@@ -386,6 +426,7 @@ samples <- nimbleMCMC(code = littersCode,
                       nburnin = 100, nchains = 1,
                       setSeed = TRUE)
 ```
+]
 
 --- 
 
