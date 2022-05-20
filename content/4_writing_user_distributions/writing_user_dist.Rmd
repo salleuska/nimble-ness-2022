@@ -1,5 +1,5 @@
 ---
-  title: "Customizing an MCMC`"
+title: "Customizing an MCMC`"
 subtitle: "NIMBLE NESS 2022 short course"
 author: "NIMBLE Development Team"
 date: "May 2022"
@@ -8,11 +8,13 @@ date: "May 2022"
 #   beamer_presentation: default
 output:
   xaringan::moon_reader:
-  lib_dir: libs
-nature:
-  highlightStyle: github
-highlightLines: true
-countIncrementalSlides: false
+    css: [default, tamu-fonts, mystyle.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightSpans: true
+      highlightLines: true
+      countIncrementalSlides: false
 ---
 
 ```{r chunksetup, include=FALSE} 
@@ -21,37 +23,64 @@ countIncrementalSlides: false
 library(methods)  # otherwise new() not being found - weird
 library(nimble)
 library(coda)
-read_chunk('chunks_litters.R')
 ```
----
-# Introduction
+
+```{r, data-example, eval=TRUE, echo=FALSE, results = 'hide', message=FALSE}
+if(!exists('littersModel'))
+   source(file.path("..", "examples", "chunks_litters.R"),  chdir = TRUE)
+```
+
+### Introduction
 
 NIMBLE provides a variety of distributions, as seen in [Section 5.2.4 of the NIMBLE manual](http://r-nimble.org/manuals/NimbleUserManual.pdf#page=39). 
 
-However, there are lots of other probability distributions out there that you might want to use. So NIMBLE allows you to code up your own distribution and then use it in BUGS code.
+However, there are lots of other probability distributions out there that you might want to use. So NIMBLE allows you to **code up your own distribution** and then use it in BUGS code.
 
 Furthermore, in some cases one can use a user-defined distribution as a way to reduce computation by analytically integrating over a component of the model.
 
 ---
-# Litters example context
+### Litters example context
 
 In the litters example, we know that if we marginalize over the random probabilities (which are beta distributed) we induce a compound distribution for the data given the hyperparameters -- a beta-binomial distribution.
+
+```{r, litters-codem, eval=FALSE}
+library(nimble)
+littersCode <- nimbleCode({
+  for (i in 1:G) {
+     for (j in 1:N) {
+        # Likelihood (data model)
+        r[i,j] ~ dbin(p[i,j], n[i,j])
+        # Latent process (random effects)
+        p[i,j] ~ dbeta(a[i], b[i]) 
+     }
+     # Priors for hyperparameters (not reccomended)
+     a[i] ~ dgamma(1, .001)
+     b[i] ~ dgamma(1, .001)
+   }
+})
+```
 
 NIMBLE does not provide the beta-binomial distribution, but we make it easy for you to create your own distributions. 
 
 ---
+### Writing your own distribution 
 
-# Writing your own distribution 
-
- Here's what you would do to code up your own beta-binomial distribution and make it available in BUGS code.
+Here's what you would do to code up your own beta-binomial distribution and make it available in BUGS code.
 
 First we write nimbleFunctions for the density and simulation functions. Note the naming is analogous to how probability distributions are handled in R. 
 
-  - The 'd' function should have *log* as its last argument, a binary argument for whether the log density is returned or not. 
-  - The 'r' function should have *n* as its first argument but need only work for ```n=1```.
+- The 'd' function should have `log` as its last argument, a binary argument for whether the log density is returned or not. 
+
+- The 'r' function should have `n` as its first argument but need only work for `n=1`.
 
 ---
 
+### Density function
+
+$$
+f(x; n, \alpha, \beta) = \frac{\Gamma(n + 1)}{\Gamma(x + 1) \Gamma(n - x + 1)}\frac{\Gamma(x + \alpha) \Gamma(n - x + \beta)}{\Gamma(n + \alpha + \beta)}\frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha)\Gamma(\beta)}
+$$
+in NIMBLE: 
 ```{r, dbetabin}
 dbetabin <- nimbleFunction(
     run = function(x = double(0), alpha = double(0), beta = double(0),
@@ -66,7 +95,19 @@ dbetabin <- nimbleFunction(
         if(log) return(logProb)
         else return(exp(logProb))
     })
+```
 
+---
+### Sampling function
+
+Sampling from $\mbox{BetaBinomial}(n, \alpha, \beta)$ is done it two stages:
+$$
+  p \sim \mbox{Beta}(\alpha, \beta) \quad x| p \sim \mbox{Binom}(n, p)
+$$
+
+We do the same in nimble
+
+```{r, rbetabin}
 rbetabin <- nimbleFunction(
     run = function(n = integer(0), alpha = double(0), beta = double(0),
         size = double(0)) {
@@ -78,16 +119,25 @@ rbetabin <- nimbleFunction(
         return(rbinom(1, size = size, prob = p))
     })
 ```
----
-
-The functions are written as ``nimbleFunctions``. These are functions that NIMBLE can translate into C++ and use in conjunction with models. In later modules we'll see more about this, but for now a few comments:
-
-  - ``nimbleFunctions`` are written using a subset of R syntax: not all R syntax is allowed.
-  - We require information about the types and sizes of arguments and return values.
-  - ``nimbleFunctions`` can call out to arbitrary R or C/C++ code that you write for full customizability.
 
 ---
-# Additional comments on user-defined distributions
+
+**Note**: The functions are written as `nimbleFunctions`. These are functions that NIMBLE can translate into C++ and use in conjunction with models:
+
+- `nimbleFunctions` are written using a subset of R syntax: not all R syntax is allowed.
+
+- We require information about the types and sizes of arguments and return values (static typing vs R dynamic typing)
+```{r, dbetabin-detail, eval=FALSE}
+dbetabin <- nimbleFunction(
+    run = function(x = `double(0)`, alpha = `double(0)`, beta = `double(0)`...) 
+```
+`type(size)` where `type = {integer, double, logical, character}` and size is `{0,1,2,3,..}` (scalar, vector, matrix, 3D array, ..)
+
+- `nimbleFunctions` can call out to arbitrary R or C/C++ code that you write for full customizability.
+
+
+---
+### Additional comments on user-defined distributions
 
 ```{r, scopefix, echo=FALSE}
 # not clear why dbetabin() not being put into global
@@ -117,7 +167,7 @@ littersMargCode <- nimbleCode({
    }
 })
 ```
----
+
 Now we'll try it out. Given the skewed, positive-valued distributions, we'll make a tweak to the samplers to do a random walk on the log-scale.
 
 ```{r, litters-setup, include=FALSE}
@@ -136,16 +186,22 @@ littersInits <- list( a = c(2, 2), b=c(2, 2) )
 ```
 ---
 
+.scroll-box-20[
+
 ```{r, use-dist, fig.width=12, fig.height=6, fig.cap=''}
 littersMargModel <- nimbleModel(littersMargCode, 
-          data = littersData, constants = littersConsts, inits = littersInits)
+          data = littersData, 
+          constants = littersConsts, 
+          inits = littersInits)
 cLittersMargModel <- compileNimble(littersMargModel)
 littersMargConf <- configureMCMC(littersMargModel, print = TRUE)
 hypers <- c('a[1]', 'b[1]', 'a[2]', 'b[2]')
+
 for(h in hypers) {
       littersMargConf$removeSamplers(h)
       littersMargConf$addSampler(target = h, type = 'RW', control = list(log = TRUE))
 }
+
 littersMargConf$printSamplers()
 
 littersMargMCMC <- buildMCMC(littersMargConf)
@@ -156,11 +212,18 @@ set.seed(1)
 samplesMarg <- runMCMC(cLittersMargMCMC, niter = niter, nburnin = nburn,
         inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
 ```
+]
 ---
+
 # Using the distribution: results
 
+.scroll-box-8[
+```{r}
+effectiveSize(samplesMarg)
+```
+]
 
-```{r, use-dist-results, fig.width=12, fig.height=6, fig.cap=''}
+```{r, use-dist-results, fig.width=12, fig.height=6, fig.cap='', fig.show='hide'}
 par(mfrow = c(2, 2), mai = c(.6, .5, .4, .1), mgp = c(1.8, 0.7, 0))
 ts.plot(samplesMarg[ , 'a[1]'], xlab = 'iteration',
      ylab = expression(a[1]), main = expression(a[1]))
@@ -171,9 +234,11 @@ ts.plot(samplesMarg[ , 'a[2]'], xlab = 'iteration',
 ts.plot(samplesMarg[ , 'b[2]'], xlab = 'iteration',
      ylab = expression(b[2]), main = expression(b[2]))
 
-effectiveSize(samplesMarg)
 ```
 
+---
+
+![](`r knitr::fig_chunk("use-dist-results", "png")`)
 
 That works better than without marginalization. It would probably be even better if we blocked each pair of hyperparameters. 
 

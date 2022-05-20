@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Customizing an MCMC</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/tamu-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mystyle.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Customizing an MCMC
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
+---
+
+
+
+
+
+### Introduction
+
+- NIMBLE allows you to write your own sampler and use it in combination with NIMBLE's built-in samplers.
+
+- If you've developed a new MCMC sampling algorithm or want to try out an algorithm from the literature, you may want to combine it with standard samplers.
+
+- Or for someone with a specific model, you might want to do some very specific sampling approach for one or a few parameters in your model and rely on NIMBLE's built-in samplers for the rest of the model.
+
+- Here we'll see an illustration of how to do this.
+
+---
+### The reflection sampler
+
+Suppose you have a parameter with a finite domain, in particular a fixed lower bound, such as a gamma distribution, a uniform distribution, or a lognormal distribution.
+
+A standard Metropolis sampler could propose a value that is below the lower bound. This would give a probability density for the proposed value that is zero so the proposal would be rejected. That's fine, but it wastes the computation involved in proposing the value and determining that it should be rejected. If the current value of the parameter under consideration is near the bound, this will happen nearly 50% of the time. 
+
+Instead, we can use **reflection**. If the proposed `\(\theta^\prime &lt; b\)` where `\(b\)` is the bound, simply set `\(\theta^\prime\)` to `\(b + (b-\theta^\prime)\)`
+
+---
+
+&lt;center&gt;&lt;img src="reflection.jpg"&gt;&lt;/center&gt;
+
+---
+### Writing a nimbleFunction for the reflection sampler
+
+The *run* function for the reflection sampler needs to check the proposed value against the distribution bounds and modify the proposal as needed.
+
+However, we first need to modify the *setup* function to check if the distribution has finite lower or upper bounds and only consider scalar parameters, thereby avoiding some computation at run-time. 
+
+.scroll-box-16[
+
+```r
+RW_reflect &lt;- nimbleFunction(
+    contains = sampler_BASE,
+    setup = function(model, mvSaved, target, control) {
+        ## Some checking...
+        targetComponents &lt;- model$expandNodeNames(target, returnScalarComponents = TRUE)
+        if(length(targetComponents) &gt; 1)
+            stop("RW_reflect: cannot use univariate RW sampler on multivariate target, try RW_block sampler.")
+
+        ## Is the reflection sampler appropriate?
+        dist &lt;- model$getDistribution(target)
+        rg &lt;- getDistributionInfo(dist)$range
+        if(rg[[1]] &gt; -Inf || rg[[2]] &lt; Inf)
+            reflect &lt;- TRUE else reflect &lt;- FALSE
+
+        calcNodes  &lt;- model$getDependencies(target)
+    },
+    
+    run = function() {
+        propValue &lt;- rnorm(1, mean = model[[target]], sd = scale)
+
+        if(reflect) {
+            lower &lt;- model$getBound(target, 'lower')
+            upper &lt;- model$getBound(target, 'upper')
+            if(propValue &lt; lower) propValue &lt;- 2*lower - propValue
+            if(propValue &gt; upper) propValue &lt;- 2*upper - propValue
+        }
+ 
+        model[[target]] &lt;&lt;- propValue
+        ## Calculate difference of log posterior relative to previous value (which has been saved).
+        logMHR &lt;- calculateDiff(model, calcNodes) 
+        jump &lt;- decide(logMHR)
+        if(jump)
+            nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodes, 
+                    logProb = TRUE)
+        else
+            nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodes, 
+                    logProb = TRUE)
+    },
+    methods = list(
+        reset = function () {}
+    )
+)
+```
+]
+---
+
+# NIMBLE's Metropolis sampler
+
+- Often it's easiest when writing a new sampler that is similar to an existing NIMBLE sampler to just modify the code for the existing sampler. 
+
+- In this case, NIMBLE's existing random walk sampler has some nice additional functionality that we can include in our reflection sampler, specifically the ability to adapt the proposal variance. 
+
+- You can see all of our sampler nimbleFunctions in the file *R/MCMC_samplers.R* in the [NIMBLE source package](https://cran.r-project.org/src/contrib/nimble_0.12.1.tar.gz), also available as [MCMC_samplers.R](MCMC_samplers.R) in this repository.
+
+- In the next slide there is the full new reflection sampler, building on NIMBLE's baseline random walk sampler to include adaptation.
+
+---
+.scroll-box-20[
+
+```r
+RW_reflect &lt;- nimbleFunction(
+    contains = sampler_BASE,
+    setup = function(model, mvSaved, target, control) {
+        ## control list extraction
+        logScale      &lt;- if(!is.null(control$log))
+                      control$log else FALSE
+        reflective    &lt;- if(!is.null(control$reflective))
+                      control$reflective else FALSE
+        adaptive      &lt;- if(!is.null(control$adaptive))
+                      control$adaptive else TRUE
+        adaptInterval &lt;- if(!is.null(control$adaptInterval))
+                      control$adaptInterval else 200
+        scale         &lt;- if(!is.null(control$scale))
+                      control$scale else 1
+        ###  node list generation  ###
+        targetAsScalar &lt;- model$expandNodeNames(target, 
+                       returnScalarComponents = TRUE)
+        if(length(targetAsScalar) &gt; 1)     
+                       stop('more than one target; cannot use RW_reflect sampler, try RW_block sampler')
+        if(model$isDiscrete(target))
+                       stop('cannot use RW_reflect sampler on discrete-valued target; try slice sampler')
+
+        ### ADDED code ############################################
+        dist &lt;- model$getDistribution(target)
+        rg &lt;- getDistributionInfo(dist)$range
+        if(rg[[1]] &gt; -Inf || rg[[2]] &lt; Inf)
+                  reflect &lt;- TRUE else reflect &lt;- FALSE
+        ###########################################################
+
+        calcNodes  &lt;- model$getDependencies(target)
+        ###  numeric value generation  ###
+        scaleOriginal &lt;- scale
+        timesRan      &lt;- 0
+        timesAccepted &lt;- 0
+        timesAdapted  &lt;- 0
+        scaleHistory          &lt;- c(0, 0)
+        acceptanceRateHistory &lt;- c(0, 0)
+        optimalAR &lt;- 0.44
+        gamma1    &lt;- 0
+    },
+    
+    run = function() {
+        propValue &lt;- rnorm(1, mean = model[[target]], sd = scale)
+
+        ### ADDED code ############################################
+        if(reflect) {
+            lower &lt;- model$getBound(target, 'lower')
+            upper &lt;- model$getBound(target, 'upper')
+             if(propValue &lt; lower) propValue &lt;- 2*lower - propValue
+             if(propValue &gt; upper) propValue &lt;- 2*upper - propValue
+        }
+        ###########################################################
+
+        model[[target]] &lt;&lt;- propValue
+        logMHR &lt;- calculateDiff(model, calcNodes)
+        jump &lt;- decide(logMHR)
+        if(jump)
+            nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodes, 
+                         logProb = TRUE)
+        else
+            nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodes, 
+                         logProb = TRUE)
+        if(adaptive)     adaptiveProcedure(jump)
+    },
+    
+    methods = list(
+        
+        adaptiveProcedure = function(jump = logical()) {
+            timesRan &lt;&lt;- timesRan + 1
+            if(jump)     timesAccepted &lt;&lt;- timesAccepted + 1
+            if(timesRan %% adaptInterval == 0) {
+                acceptanceRate &lt;- timesAccepted / timesRan
+                timesAdapted &lt;&lt;- timesAdapted + 1
+                setSize(scaleHistory,          timesAdapted)
+                setSize(acceptanceRateHistory, timesAdapted)
+                scaleHistory[timesAdapted] &lt;&lt;- scale
+                acceptanceRateHistory[timesAdapted] &lt;&lt;- acceptanceRate
+                gamma1 &lt;&lt;- 1/((timesAdapted + 3)^0.8)
+                gamma2 &lt;- 10 * gamma1
+                adaptFactor &lt;- exp(gamma2 * (acceptanceRate - optimalAR))
+                scale &lt;&lt;- scale * adaptFactor
+                timesRan &lt;&lt;- 0
+                timesAccepted &lt;&lt;- 0
+            }
+        },
+        
+        reset = function() {
+            scale &lt;&lt;- scaleOriginal
+            timesRan      &lt;&lt;- 0
+            timesAccepted &lt;&lt;- 0
+            timesAdapted  &lt;&lt;- 0
+            scaleHistory          &lt;&lt;- scaleHistory          * 0
+            acceptanceRateHistory &lt;&lt;- acceptanceRateHistory * 0
+            gamma1 &lt;&lt;- 0
+        }
+    )
+)
+```
+]
+
+---
+
+
+### Using the new sampler: setup
+
+Using the sampler is simple. Just modify the default MCMC configuration for a model to use the new sampler on a node of interest.
+
+Let's try this with a simulated example where the true value of a variance component, named tau, is zero. We'll set up the model so that the default sampler for `tau` is a RW sampler so that the comparison with the reflection version is reasonable.
+
+
+
+```r
+set.seed(1)
+m  &lt;- nsub &lt;- 10
+id &lt;- rep(1:m, each = nsub)
+n &lt;- length(id)
+x &lt;- runif(n)
+x  &lt;- x - mean(x)
+b0 &lt;- 2
+b1 &lt;- 3
+y &lt;- b0 + b1*x + rnorm(n)
+y &lt;- matrix(y, nrow = m)
+x &lt;- matrix(x, nrow = m)
+```
+
+---
+
+And here's the model, with a default MCMC.
+
+
+```r
+code  &lt;- nimbleCode({
+    for(j in 1:m) {
+        for(i in 1:nsub) {
+            y[j,i] ~ dnorm(b0[j] + b1*x[j,i], sd = sigma)
+        }
+        b0[j] ~ dnorm(mu, sd = tau)
+    }
+    sigma ~ dunif(0, 20) 
+    tau ~ dunif(0, 20)
+    b1 ~ dflat()
+    mu ~ dflat()
+})
+    
+model &lt;- nimbleModel(code, data = list(y = y),
+                  constants = list(x = x, m = m, nsub = nsub),
+                  inits = list(mu = 0, sigma = 0.5, tau = 0.5, b1 = 0))
+cModel  &lt;- compileNimble(model)
+conf &lt;- configureMCMC(cModel)
+```
+
+```
+## ===== Monitors =====
+## thin = 1: b1, mu, sigma, tau
+## ===== Samplers =====
+## RW sampler (2)
+##   - sigma
+##   - tau
+## conjugate sampler (12)
+##   - b1
+##   - mu
+##   - b0[]  (10 elements)
+```
+
+```r
+MCMC  &lt;- buildMCMC(conf)
+cMCMC  &lt;- compileNimble(MCMC)
+smp1  &lt;- runMCMC(cMCMC)
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+
+```r
+par(mfrow = c(1,2))
+ts.plot(smp1[ , 'tau'], ylab = 'tau', xlab = 'iteration')
+ts.plot(smp1[ , 'mu'], ylab = 'mu', xlab = 'iteration')
+```
+
+![](writing_user_sampler_files/figure-html/mcmc-1.png)&lt;!-- --&gt;
+
+---
+
+
+### Using the new sampler: modifying the MCMC configuration
+
+
+Now we'll try the reflection sampler instead. We can just assign it as a sampler
+in the way we've seen before.
+
+
+```r
+conf$removeSamplers('tau')
+conf$addSampler('tau', type = 'RW_reflect')
+
+MCMC2 &lt;- buildMCMC(conf)
+cMCMC2 &lt;- compileNimble(MCMC2, resetFunctions = TRUE)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+nimCopy(model, cModel)  # initialize 2nd MCMC same as 1st MCMC
+smp2 &lt;- runMCMC(cMCMC2)
+```
+
+```
+## Running chain 1 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+---
+
+![](writing_user_sampler_files/figure-html/unnamed-chunk-1-1.png)&lt;!-- --&gt;
+
+So we see that the sampler mixes rather better, able to escape from near zero more quickly. 
+Mixing is still not great, because of the posterior dependence between `tau` and the `b0` random effects. 
+---
+### Required arguments and methods for a sampler `nimbleFunction`
+
+- It must contain the argument `contains = sampler_BASE`.
+- (This is a simple class inheritance system that mimic's R's *contains* argument.)
+
+- The `setup` function must take the arguments `model`, `mvSaved`, `target`, and `control`.
+
+  - `model` is the model being sampled.
+  - `mvSaved` is a length-one `modelValues` object that keeps an up-to-date copy of all model values, including log probabilities.
+  - `target` is a vector of node names to be sampled.
+  - `control` is a list that can contain whatever elements you want.
+
+- The `run` function (method) must execute the sampler.
+
+- The `reset` method must reset the sampler if that means anything for the particular sampler.
+  - Example: An adaptive sampler would reset its proposal distribution.
+
+---
+### Required behavior of a sampler:
+
+- Upon entry, the sampler can assume that `mvSaved[[1]]` contains a complete copy of the model's variables, including logProb variables.
+
+- The sampler may do whatever it wants (assuming it is valid for MCMC) in its `run` function, including modifying values of model variables, including logProb variables.
+
+- Upon exiting the `run` function, `mvSaved[[1]]` must again contain a complete copy of the model's variables, including logProb variables.
+
+  - The `mvSaved[[1]]` is like the "current" state of the model.
+  - The `run` function puts proposed values in the model and does appropriate calculations.
+  - If the proposal is rejected: copy from `mvSaved[[1]]` to the model.
+  - If the proposal is accepted: copy from the model to `mvSaved[[1]]`.
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightSpans": true,
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

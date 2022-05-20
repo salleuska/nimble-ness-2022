@@ -1,10 +1,17 @@
 ---
-title: "User-defined MCMC samplers"
-subtitle: "enviBayes 2021 tutorial"
+title: "Customizing an MCMC"
+subtitle: "NIMBLE NESS 2022 short course"
 author: "NIMBLE Development Team"
+date: "May 2022"
 output:
-  html_document:
-    code_folding: show
+  xaringan::moon_reader:
+    css: [default, tamu-fonts, mystyle.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightSpans: true
+      highlightLines: true
+      countIncrementalSlides: false
 ---
 
 
@@ -15,33 +22,37 @@ library(methods)  # otherwise new() not being found
 library(nimble)
 ```
 
-# Introduction
+### Introduction
 
-NIMBLE allows you to write your own sampler and use it in combination with NIMBLE's built-in samplers.
+- NIMBLE allows you to write your own sampler and use it in combination with NIMBLE's built-in samplers.
 
-If you've developed a new MCMC sampling algorithm or want to try out an algorithm from the literature, you may want to combine it with standard samplers.
+- If you've developed a new MCMC sampling algorithm or want to try out an algorithm from the literature, you may want to combine it with standard samplers.
 
-Or for someone with a specific model, you might want to do some very specific sampling approach for one or a few parameters in your model and rely on NIMBLE's built-in samplers for the rest of the model.
+- Or for someone with a specific model, you might want to do some very specific sampling approach for one or a few parameters in your model and rely on NIMBLE's built-in samplers for the rest of the model.
 
-Here we'll see an illustration of how to do this.
+- Here we'll see an illustration of how to do this.
 
-# The reflection sampler
+---
+### The reflection sampler
 
 Suppose you have a parameter with a finite domain, in particular a fixed lower bound, such as a gamma distribution, a uniform distribution, or a lognormal distribution.
 
 A standard Metropolis sampler could propose a value that is below the lower bound. This would give a probability density for the proposed value that is zero so the proposal would be rejected. That's fine, but it wastes the computation involved in proposing the value and determining that it should be rejected. If the current value of the parameter under consideration is near the bound, this will happen nearly 50% of the time. 
 
-Instead, we can use *reflection*. If the proposed $\theta^\prime < b$ where $b$ is the bound, simply set $\theta^\prime$ to $b + (b-\theta^\prime)$
+Instead, we can use **reflection**. If the proposed $\theta^\prime < b$ where $b$ is the bound, simply set $\theta^\prime$ to $b + (b-\theta^\prime)$
+
+---
 
 <center><img src="reflection.jpg"></center>
 
-
-# Writing a nimbleFunction for the reflection sampler
+---
+### Writing a nimbleFunction for the reflection sampler
 
 The *run* function for the reflection sampler needs to check the proposed value against the distribution bounds and modify the proposal as needed.
 
 However, we first need to modify the *setup* function to check if the distribution has finite lower or upper bounds and only consider scalar parameters, thereby avoiding some computation at run-time. 
 
+.scroll-box-16[
 ```{r, reflect-sampler}
 RW_reflect <- nimbleFunction(
     contains = sampler_BASE,
@@ -86,16 +97,21 @@ RW_reflect <- nimbleFunction(
     )
 )
 ```
-
+]
+---
 
 # NIMBLE's Metropolis sampler
 
-Often it's easiest when writing a new sampler that is similar to an existing NIMBLE sampler to just modify the code for the existing sampler. In this case, NIMBLE's existing random walk sampler has some nice additional functionality that we can include in our reflection sampler, specifically the ability to adapt the proposal variance. 
+- Often it's easiest when writing a new sampler that is similar to an existing NIMBLE sampler to just modify the code for the existing sampler. 
 
+- In this case, NIMBLE's existing random walk sampler has some nice additional functionality that we can include in our reflection sampler, specifically the ability to adapt the proposal variance. 
 
-Below is the full new reflection sampler, building on NIMBLE's baseline random walk sampler to include adaptation. (You can see all of our sampler nimbleFunctions in the file *R/MCMC_samplers.R* in the [NIMBLE source package](https://cran.r-project.org/src/contrib/nimble_0.12.1.tar.gz), also available as [MCMC_samplers.R](MCMC_samplers.R) in this repository.)
+- You can see all of our sampler nimbleFunctions in the file *R/MCMC_samplers.R* in the [NIMBLE source package](https://cran.r-project.org/src/contrib/nimble_0.12.1.tar.gz), also available as [MCMC_samplers.R](MCMC_samplers.R) in this repository.
 
+- In the next slide there is the full new reflection sampler, building on NIMBLE's baseline random walk sampler to include adaptation.
 
+---
+.scroll-box-20[
 ```{r, newSampler}
 RW_reflect <- nimbleFunction(
     contains = sampler_BASE,
@@ -196,8 +212,12 @@ RW_reflect <- nimbleFunction(
 )
 
 ```
+]
 
-# Using the new sampler: setup
+---
+
+
+### Using the new sampler: setup
 
 Using the sampler is simple. Just modify the default MCMC configuration for a model to use the new sampler on a node of interest.
 
@@ -218,13 +238,17 @@ y <- matrix(y, nrow = m)
 x <- matrix(x, nrow = m)
 ```
 
+---
+
 And here's the model, with a default MCMC.
 
-```{r, mcmc, fig.cap='', fig.width=10}
+```{r, mcmc, fig.cap='', fig.width=10, message=FALSE}
+
 code  <- nimbleCode({
     for(j in 1:m) {
-        for(i in 1:nsub)
+        for(i in 1:nsub) {
             y[j,i] ~ dnorm(b0[j] + b1*x[j,i], sd = sigma)
+        }
         b0[j] ~ dnorm(mu, sd = tau)
     }
     sigma ~ dunif(0, 20) 
@@ -246,13 +270,14 @@ ts.plot(smp1[ , 'tau'], ylab = 'tau', xlab = 'iteration')
 ts.plot(smp1[ , 'mu'], ylab = 'mu', xlab = 'iteration')
 ```
 
+---
 ```{r, scopefix, echo=FALSE, fig.cap='', fig.width=5, fig.height=5}
 # not clear why RW_reflect() not being put into global
 # if this isn't done, configureMCMC fails to find sampler_RW_reflect in knitr
 assign('RW_reflect', RW_reflect, .GlobalEnv)
 ```
 
-# Using the new sampler: modifying the MCMC configuration
+### Using the new sampler: modifying the MCMC configuration
 
 
 Now we'll try the reflection sampler instead. We can just assign it as a sampler
@@ -267,6 +292,10 @@ cMCMC2 <- compileNimble(MCMC2, resetFunctions = TRUE)
 
 nimCopy(model, cModel)  # initialize 2nd MCMC same as 1st MCMC
 smp2 <- runMCMC(cMCMC2)
+```
+---
+
+```{r, dpi = 300, fig.height=3, fig.width=6, echo=FALSE}
 par(mfrow = c(1,2))
 ts.plot(smp2[ , 'tau'], ylab = 'tau', xlab = 'iteration')
 ts.plot(smp2[ , 'mu'], ylab = 'mu', xlab = 'iteration')
@@ -274,37 +303,35 @@ ts.plot(smp2[ , 'mu'], ylab = 'mu', xlab = 'iteration')
 
 So we see that the sampler mixes rather better, able to escape from near zero more quickly. 
 Mixing is still not great, because of the posterior dependence between `tau` and the `b0` random effects. 
-
-# Required arguments and methods for a sampler `nimbleFunction`
+---
+### Required arguments and methods for a sampler `nimbleFunction`
 
 - It must contain the argument `contains = sampler_BASE`.
+- (This is a simple class inheritance system that mimic's R's *contains* argument.)
 
-    - (This is a simple class inheritance system that mimic's R's *contains* argument.)
+- The `setup` function must take the arguments `model`, `mvSaved`, `target`, and `control`.
 
-- The *setup* function must take the arguments *model*, *mvSaved*, *target*, and *control*.
+  - `model` is the model being sampled.
+  - `mvSaved` is a length-one `modelValues` object that keeps an up-to-date copy of all model values, including log probabilities.
+  - `target` is a vector of node names to be sampled.
+  - `control` is a list that can contain whatever elements you want.
 
-    - *model* is the model being sampled.
-    - *mvSaved* is a length-one *modelValues* object that keeps an up-to-date copy of all model values, including log probabilities.
-    - *target* is a vector of node names to be sampled.
-    - *control* is a list that can contain whatever elements you want.
+- The `run` function (method) must execute the sampler.
 
-- The *run* function (method) must execute the sampler.
+- The `reset` method must reset the sampler if that means anything for the particular sampler.
+  - Example: An adaptive sampler would reset its proposal distribution.
 
-- The *reset* method must reset the sampler if that means anything for the particular sampler.
-
-    - Example: An adaptive sampler would reset its proposal distribution.
-
-
-# Required behavior of a sampler:
+---
+### Required behavior of a sampler:
 
 - Upon entry, the sampler can assume that `mvSaved[[1]]` contains a complete copy of the model's variables, including logProb variables.
 
-- The sampler may do whatever it wants (assuming it is valid for MCMC) in its *run* function, including modifying values of model variables, including logProb variables.
+- The sampler may do whatever it wants (assuming it is valid for MCMC) in its `run` function, including modifying values of model variables, including logProb variables.
 
-- Upon exiting the *run* function, `mvSaved[[1]]` must again contain a complete copy of the model's variables, including logProb variables.
+- Upon exiting the `run` function, `mvSaved[[1]]` must again contain a complete copy of the model's variables, including logProb variables.
 
-    - The `mvSaved[[1]]` is like the "current" state of the model.
-    - The *run* function puts proposed values in the model and does appropriate calculations.
-    - If the proposal is rejected: copy from `mvSaved[[1]]` to the model.
-    - If the proposal is accepted: copy from the model to `mvSaved[[1]]`.
+  - The `mvSaved[[1]]` is like the "current" state of the model.
+  - The `run` function puts proposed values in the model and does appropriate calculations.
+  - If the proposal is rejected: copy from `mvSaved[[1]]` to the model.
+  - If the proposal is accepted: copy from the model to `mvSaved[[1]]`.
 

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Writing nimbleFunctions to implement algorithms</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/tamu-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mystyle.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Writing nimbleFunctions to implement algorithms
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
+---
+
+
+
+
+
+## Introduction
+
+`nimbleFunctions` are at the heart of NIMBLE. They are the way that algorithms are implemented. They can also be used for
+
+ - user-defined distributions in models (already seen),
+ - user-defined functions in models (not seen, but similar to user-defined distributions)
+ - user-defined MCMC samplers (coming soon), and
+ - compiling parts of R (not seen), without reference to a model.
+
+But their main purpose is providing a way for developers to implement algorithms.
+---
+## Why develop an algorithm in NIMBLE?
+
+ - You get flexible hierarchical modeling infrastructure "for free".
+ - The NIMBLE system allows you to program essentially arbitrary computations.
+ - You can combine your method with or build on top of  ones already available in NIMBLE.
+ - You can distribute your method as a separate package that uses NIMBLE.
+
+---
+## Components of a nimbleFunction
+
+NIMBLE uses the concept of **two-stage evaluation** from computer science to run a model-specific algorithm based on model-generic algorithm code. The first stage of evaluation specializes the algorithm to the model of interest via `setup` code. The second stage runs the algorithm via `run` code. 
+
+Thus, a `nimbleFunction` has two parts:
+
+ - `setup` code: used to tailor the algorithm to a particular model structure. Often this involves determining dependencies amongst nodes in the model and setting up storage using `modelValues`
+ 
+ - `run` code: the guts of the algorithm, written generically so it will apply to any (appropriate) model
+---
+## Components of a nimbleFunction
+
+Setup code is written as a R function, using R code, usually including NIMBLE's special functions for querying the model structure (see the [module on querying model structure](10_model_structure.html)). 
+
+Run code is written using the NIMBLE *domain-specific language* (DSL). While this is formally a language distinct from R, you can just think of it as a subset of R, enhanced with some functions for operating on the model.
+---
+## Some syntax for nimbleFunctions
+
+Here are some of the functions you may use in the run function of a nimbleFunction:
+
+- `returnType`, e.g., `returnType(double(1))` for a vector of reals
+- `length`, e.g., `length(x)` to determine the length of a run-time argument `x`
+- `numeric`, `matrix` and `array` e.g., `result &lt;- numeric(n, init = 1.0)` to create a vector of reals called `result` initialized with values of 1.0
+- model member functions `calculate`, `simulate`, `getLogProb`, `calculateDiff` and `getParam` to manipulate the model
+- direct access to nodes or variables in a model using typical R syntax, e.g., `model[[myNode]] &lt;- rnorm(1)`
+- `values()` and `copy()` (or, equivalently, `nimCopy`) to copy values
+- `print()` and `cat()`
+- basic math, including vectorized math and some linear algebra
+- random number generation functions, e.g., `rnorm(1, 100, 5)`
+- calling out to arbitrary R or C/C++ code with `nimbleRcall()` and `nimbleExternalCall()`
+- `nimbleList` data structures.
+
+---
+
+Section IV of the NIMBLE User Manual describes the syntax for *run* code in detail, including lots of neat functionality such as using nested nimbleFunctions and having multiple run-time functions (i.e., class methods) as part of a nimbleFunction. We'll see more of that in future modules.
+
+This [tips and tricks page](https://github.com/nimble-dev/nimble/wiki/Tips-for-avoiding-errors-in-nimbleFunction-programming-and-compilation-%28DSL%29) details some syntax that does NOT work due to some clunkiness in our compilation system. 
+
+nimbleFunctions use **pass-by-reference** not R style **pass-by-value**, so be careful about modifying an object and then using it elsewhere.
+  
+---
+## A basic example: empirical Bayes / maximum marginal likelihood
+
+Let's consider how we would optimize the parameters in a model using a nimbleFunction. Basically, we'll just construct an objective function that we can then pass to R's *optim* function to do the actual numerical optimization. (NIMBLE also has an `optim()` that you can use within a nimbleFunction.)
+
+This amounts to setting things up to find the posterior mode of a model; this is generally a reasonable thing to do only for models with a small number of parameters and without hierarchical structure. That sounds restrictive, but if you can marginalize out the latent process values, then we're doing empirical Bayes (or maximum a posteriori, depending on whether we include the priors...).
+---
+## A nimbleFunction for the litters marginalized model
+
+
+```r
+objective &lt;- nimbleFunction(
+    setup = function(model) {
+          # Ordinarily we would do stuff here, but in this case
+          # we only need make the nimbleFunction aware of the model.
+          },
+    run = function(par = double(1)) {
+        returnType(double(0))
+        ## Assignment into model or variables created in setup code
+        ## requires global assignment operator, &lt;&lt;-
+        model[['a']] &lt;&lt;- exp(par[1:2])
+        model[['b']] &lt;&lt;- exp(par[3:4])
+        ## Update the model given param values
+        model$calculate()
+        ## Return the likelihood
+        ans &lt;- model$getLogProb('r')
+        return(ans)
+    }
+)
+```
+
+This is actually a nimbleFunction **generator** -- we can't run it yet -- we need to create a specialized instance of the nimbleFunction that is tailored for some model, in our case the marginalized litters model. 
+---
+### Specializing the nimbleFunction to the model
+
+First let's build the marginalized litters model again.
+
+
+
+Now we specialize the algorithm to the specific model object.
+
+
+```r
+rObjective &lt;- objective(littersMargModel)
+cObjective &lt;- compileNimble(rObjective, project = littersMargModel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+---
+
+Now let's try using it.
+
+.scroll-box-20[
+
+
+```r
+system.time(optR &lt;- optim(log(rep(1,4)), rObjective$run,
+                 control = list(fnscale = -1)))
+```
+
+```
+##    user  system elapsed 
+##   2.461   0.006   2.472
+```
+
+```r
+system.time(optC &lt;- optim(log(rep(1,4)), cObjective$run,
+                 control = list(fnscale = -1)))
+```
+
+```
+##    user  system elapsed 
+##    0.01    0.00    0.01
+```
+
+```r
+optR
+```
+
+```
+## $par
+## [1]  3.7726141  0.4646302  1.5975075 -0.5813183
+## 
+## $value
+## [1] -52.78522
+## 
+## $counts
+## function gradient 
+##      283       NA 
+## 
+## $convergence
+## [1] 0
+## 
+## $message
+## NULL
+```
+
+```r
+optC
+```
+
+```
+## $par
+## [1]  3.7726141  0.4646302  1.5975075 -0.5813183
+## 
+## $value
+## [1] -52.78522
+## 
+## $counts
+## function gradient 
+##      283       NA 
+## 
+## $convergence
+## [1] 0
+## 
+## $message
+## NULL
+```
+
+```r
+exp(optC$par)
+```
+
+```
+## [1] 43.4936148  1.5914256  4.9407022  0.5591607
+```
+]
+---
+
+### Writing generic functions
+
+Let's look back at our nimbleFunction objective function. What stops the run function from being usable on any model?
+
+
+```r
+objective &lt;- nimbleFunction(
+    setup = function(model, target) {
+          ## We'll start putting stuff here soon, I promise!
+          },
+    run = function(par = double(1)) {
+        returnType(double(0))
+        model[['a']] &lt;&lt;- exp(par[1:2])
+        model[['b']] &lt;&lt;- exp(par[3:4])
+        model$calculate()
+        ans &lt;- model$getLogProb('r')   
+        return(ans)
+    }
+)
+```
+
+---
+### Writing generic functions - querying model structure
+
+Calculating the density for all model nodes is not necessary for this optimization, since we're doing maximum likelihood rather than maximum a posteriori (MAP) estimation. In particular we don't need to calculate the prior density values. We do need to make sure to calculate any  deterministic nodes intermediate between params and data (which NIMBLE might introduce behind the scenes).
+
+.scroll-box-12[
+
+```r
+objective &lt;- nimbleFunction(
+    setup = function(model, target) {
+        ## We only need to calculate the likelihood, not the full model density.
+        ## This code assumes there are no stochastic terms between 'target' nodes and data nodes.
+        calcNodes &lt;- model$getDependencies(target, self = FALSE)
+        dataNodes &lt;- model$getNodeNames(dataOnly = TRUE)
+        cat("Optimizing w.r.t. ", paste(target, collapse = ','), ".\n", sep = "")
+        cat("Calculating ", paste(calcNodes, collapse = ','), ".\n", sep = "")
+        cat("Likelihood contributions are from ", paste(dataNodes, collapse = ','), ".\n", sep = "")
+    },
+    run = function(par = double(1)) {
+        returnType(double(0))
+        ## Still assuming all params are log-transformed - not very general!
+        values(model, target) &lt;&lt;- exp(par)
+        ## Calculate likelihood, including any deterministic nodes intermediate between params and data
+        model$calculate(calcNodes)
+        ## Return the likelihood
+        ans &lt;- model$getLogProb(dataNodes) 
+        return(ans)
+    }
+)
+```
+]
+
+---
+
+```r
+rObjective &lt;- objective(littersMargModel, c('a', 'b')) ## or c('a[1]','a[2]','b[1]','b[2]')
+```
+
+```
+## Optimizing w.r.t. a,b.
+## Calculating r[1, 1],r[1, 2],r[1, 3],r[1, 4],r[1, 5],r[1, 6],r[1, 7],r[1, 8],r[1, 9],r[1, 10],r[1, 11],r[1, 12],r[1, 13],r[1, 14],r[1, 15],r[1, 16],r[2, 1],r[2, 2],r[2, 3],r[2, 4],r[2, 5],r[2, 6],r[2, 7],r[2, 8],r[2, 9],r[2, 10],r[2, 11],r[2, 12],r[2, 13],r[2, 14],r[2, 15],r[2, 16].
+## Likelihood contributions are from r[1, 1],r[1, 2],r[1, 3],r[1, 4],r[1, 5],r[1, 6],r[1, 7],r[1, 8],r[1, 9],r[1, 10],r[1, 11],r[1, 12],r[1, 13],r[1, 14],r[1, 15],r[1, 16],r[2, 1],r[2, 2],r[2, 3],r[2, 4],r[2, 5],r[2, 6],r[2, 7],r[2, 8],r[2, 9],r[2, 10],r[2, 11],r[2, 12],r[2, 13],r[2, 14],r[2, 15],r[2, 16].
+```
+
+```r
+cObjective &lt;- compileNimble(rObjective, project = littersMargModel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+optC &lt;- optim(log(rep(1,4)), cObjective$run, control = list(fnscale = -1))
+optC
+```
+
+```
+## $par
+## [1]  3.7726141  0.4646302  1.5975075 -0.5813183
+## 
+## $value
+## [1] -52.78522
+## 
+## $counts
+## function gradient 
+##      283       NA 
+## 
+## $convergence
+## [1] 0
+## 
+## $message
+## NULL
+```
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightSpans": true,
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

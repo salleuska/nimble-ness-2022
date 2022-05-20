@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Customizing an MCMC`</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/tamu-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mystyle.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Customizing an MCMC`
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
+---
+
+
+
+
+
+
+### Introduction
+
+NIMBLE provides a variety of distributions, as seen in [Section 5.2.4 of the NIMBLE manual](http://r-nimble.org/manuals/NimbleUserManual.pdf#page=39). 
+
+However, there are lots of other probability distributions out there that you might want to use. So NIMBLE allows you to **code up your own distribution** and then use it in BUGS code.
+
+Furthermore, in some cases one can use a user-defined distribution as a way to reduce computation by analytically integrating over a component of the model.
+
+---
+### Litters example context
+
+In the litters example, we know that if we marginalize over the random probabilities (which are beta distributed) we induce a compound distribution for the data given the hyperparameters -- a beta-binomial distribution.
+
+
+```r
+library(nimble)
+littersCode &lt;- nimbleCode({
+  for (i in 1:G) {
+     for (j in 1:N) {
+        # Likelihood (data model)
+        r[i,j] ~ dbin(p[i,j], n[i,j])
+        # Latent process (random effects)
+        p[i,j] ~ dbeta(a[i], b[i]) 
+     }
+     # Priors for hyperparameters (not reccomended)
+     a[i] ~ dgamma(1, .001)
+     b[i] ~ dgamma(1, .001)
+   }
+})
+```
+
+NIMBLE does not provide the beta-binomial distribution, but we make it easy for you to create your own distributions. 
+
+---
+### Writing your own distribution 
+
+Here's what you would do to code up your own beta-binomial distribution and make it available in BUGS code.
+
+First we write nimbleFunctions for the density and simulation functions. Note the naming is analogous to how probability distributions are handled in R. 
+
+- The 'd' function should have `log` as its last argument, a binary argument for whether the log density is returned or not. 
+
+- The 'r' function should have `n` as its first argument but need only work for `n=1`.
+
+---
+
+### Density function
+
+$$
+f(x; n, \alpha, \beta) = \frac{\Gamma(n + 1)}{\Gamma(x + 1) \Gamma(n - x + 1)}\frac{\Gamma(x + \alpha) \Gamma(n - x + \beta)}{\Gamma(n + \alpha + \beta)}\frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha)\Gamma(\beta)}
+$$
+in NIMBLE: 
+
+```r
+dbetabin &lt;- nimbleFunction(
+    run = function(x = double(0), alpha = double(0), beta = double(0),
+        size = double(0), log = integer(0, default = 0)) {
+        
+        returnType(double(0))
+        
+        logProb &lt;- lgamma(size+1) - lgamma(x+1) - lgamma(size - x + 1) +
+            lgamma(alpha + beta) - lgamma(alpha) - lgamma(beta) +
+            lgamma(x + alpha) + lgamma(size - x + beta) -
+            lgamma(size + alpha + beta)
+        if(log) return(logProb)
+        else return(exp(logProb))
+    })
+```
+
+---
+### Sampling function
+
+Sampling from `\(\mbox{BetaBinomial}(n, \alpha, \beta)\)` is done it two stages:
+$$
+  p \sim \mbox{Beta}(\alpha, \beta) \quad x| p \sim \mbox{Binom}(n, p)
+$$
+
+We do the same in nimble
+
+
+```r
+rbetabin &lt;- nimbleFunction(
+    run = function(n = integer(0), alpha = double(0), beta = double(0),
+        size = double(0)) {
+     
+        returnType(double(0))
+        
+        if(n != 1) print("rbetabin only allows n = 1; using n = 1.")
+        p &lt;- rbeta(1, alpha, beta)
+        return(rbinom(1, size = size, prob = p))
+    })
+```
+
+---
+
+**Note**: The functions are written as `nimbleFunctions`. These are functions that NIMBLE can translate into C++ and use in conjunction with models:
+
+- `nimbleFunctions` are written using a subset of R syntax: not all R syntax is allowed.
+
+- We require information about the types and sizes of arguments and return values (static typing vs R dynamic typing)
+
+```r
+dbetabin &lt;- nimbleFunction(
+    run = function(x = `double(0)`, alpha = `double(0)`, beta = `double(0)`...) 
+```
+`type(size)` where `type = {integer, double, logical, character}` and size is `{0,1,2,3,..}` (scalar, vector, matrix, 3D array, ..)
+
+- `nimbleFunctions` can call out to arbitrary R or C/C++ code that you write for full customizability.
+
+
+---
+### Additional comments on user-defined distributions
+
+
+
+The User Manual also shows how you could write CDF ('p') and inverse CDF ('q') such that you could make use of truncation with your distribution, but for standard usage all you need is the density ('d') and simulation ('r') functions (and strictly speaking you don't need the simulation function if you won't use any algorithms relying on that).
+
+If you'd like to allow for different parameterizations for your distribution, and other advanced features you can `register` the distribution with NIMBLE via `registerDistributions()` but in many cases (including this one) that is not necessary. NIMBLE will just find the distribution automatically.
+
+
+---
+# Using the distribution
+
+
+```r
+littersMargCode &lt;- nimbleCode({
+  for (i in 1:G) {
+     for (j in 1:N) {
+     	# (marginal) likelihood (data model)
+        r[i,j] ~ dbetabin(a[i], b[i], n[i,j])
+     }
+     # prior for hyperparameters (this parameterization not recommended)
+     a[i] ~ dgamma(1, .001)
+     b[i] ~ dgamma(1, .001)
+   }
+})
+```
+
+Now we'll try it out. Given the skewed, positive-valued distributions, we'll make a tweak to the samplers to do a random walk on the log-scale.
+
+
+---
+
+.scroll-box-20[
+
+
+```r
+littersMargModel &lt;- nimbleModel(littersMargCode, 
+          data = littersData, 
+          constants = littersConsts, 
+          inits = littersInits)
+```
+
+```
+## Defining model
+```
+
+```
+##   [Note] Registering 'dbetabin' as a distribution based on its use in BUGS code. If you make changes to the nimbleFunctions for the distribution, you must call 'deregisterDistributions' before using the distribution in BUGS code for those changes to take effect.
+```
+
+```
+## Building model
+```
+
+```
+## Setting data and initial values
+```
+
+```
+## Running calculate on model
+##   [Note] Any error reports that follow may simply reflect missing values in model variables.
+```
+
+```
+## Checking model sizes and dimensions
+```
+
+```r
+cLittersMargModel &lt;- compileNimble(littersMargModel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+littersMargConf &lt;- configureMCMC(littersMargModel, print = TRUE)
+```
+
+```
+## ===== Monitors =====
+## thin = 1: a, b
+## ===== Samplers =====
+## RW sampler (4)
+##   - a[]  (2 elements)
+##   - b[]  (2 elements)
+```
+
+```r
+hypers &lt;- c('a[1]', 'b[1]', 'a[2]', 'b[2]')
+
+for(h in hypers) {
+      littersMargConf$removeSamplers(h)
+      littersMargConf$addSampler(target = h, type = 'RW', control = list(log = TRUE))
+}
+
+littersMargConf$printSamplers()
+```
+
+```
+## [1] RW sampler: a[1],  log: TRUE
+## [2] RW sampler: b[1],  log: TRUE
+## [3] RW sampler: a[2],  log: TRUE
+## [4] RW sampler: b[2],  log: TRUE
+```
+
+```r
+littersMargMCMC &lt;- buildMCMC(littersMargConf)
+cLittersMargMCMC &lt;- compileNimble(littersMargMCMC, project = littersMargModel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
+niter &lt;- 5000
+nburn &lt;- 1000
+set.seed(1)
+samplesMarg &lt;- runMCMC(cLittersMargMCMC, niter = niter, nburnin = nburn,
+        inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+```
+
+```
+## Running chain 1 ...
+```
+
+```
+## |-------------|-------------|-------------|-------------|
+## |-------------------------------------------------------|
+```
+]
+---
+
+# Using the distribution: results
+
+.scroll-box-8[
+
+```r
+effectiveSize(samplesMarg)
+```
+
+```
+##      a[1]      a[2]      b[1]      b[2] 
+##  63.78525 134.97764  56.32670 105.97731
+```
+]
+
+
+```r
+par(mfrow = c(2, 2), mai = c(.6, .5, .4, .1), mgp = c(1.8, 0.7, 0))
+ts.plot(samplesMarg[ , 'a[1]'], xlab = 'iteration',
+     ylab = expression(a[1]), main = expression(a[1]))
+ts.plot(samplesMarg[ , 'b[1]'], xlab = 'iteration',
+     ylab = expression(b[1]), main = expression(b[1]))
+ts.plot(samplesMarg[ , 'a[2]'], xlab = 'iteration',
+     ylab = expression(a[2]), main = expression(a[2]))
+ts.plot(samplesMarg[ , 'b[2]'], xlab = 'iteration',
+     ylab = expression(b[2]), main = expression(b[2]))
+```
+
+---
+
+![](writing_user_dist_files/figure-html/use-dist-results-1.png)
+
+That works better than without marginalization. It would probably be even better if we blocked each pair of hyperparameters. 
+
+&lt;!--- You can try to do the blocking during the break if you'd like to practice a bit. ---&gt;
+
+Of course if you wanted samples from `p`, you'd need to write a separate R function (or a nimbleFunction) to do the post-hoc sampling given the posterior samples of `a` and `b` and the data values, `r`.  
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightSpans": true,
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
