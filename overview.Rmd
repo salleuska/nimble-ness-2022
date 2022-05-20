@@ -12,18 +12,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-# A few administrative things
-
-## Where to find stuff
+## Where to find the material
 
 The GitHub site ([https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022)) is the main repository for materials for the modules; you can also get the individual files from GitHub. 
 
 If you're not familiar with Git, you can get these materials by simply going to [https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022) and click on the 'Download ZIP' button in the right side of the window or simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip). See also slide 6 in this document for how to get them using Git or from within RStudio.
 
 
-# How we'll operate
+## The short course
 
-The workshop will be organized in modules, each of which will be a combination of lecture/demo presentation. 
+The short course will be organized in modules, each of which will be a combination of lecture/demo presentation. 
+
 
 Here are the modules we'll work through for this short course.
 
@@ -35,10 +34,15 @@ Here are the modules we'll work through for this short course.
 
 - Programming in NIMBLE
     - [4_writing_user_distributions](content/4_writing_user_distributions/writing_user_distributions.html)
-    - [5_writing_user_samplers](content//5_writing_user_samplers/writing_user_sampler.html)
-    - (extra)
-- Highlights of special features in NIMBLE
+    - [5_writing_user_samplers](content/5_writing_user_samplers/writing_user_sampler.html)
+    - (extra module) [nimbleFunctions](contentextra_nimble_functions/basic_nimbleFunction.html)
+- Highlghts of special features in NIMBLE
     - [6_nimble_highlights](content/6_nimble_highlights/nimble_highlights.html)
     
-    
+## RStudio and R Markdown
+
+I'll present most of the material from within RStudio, using R Markdown documents with embedded R code. R Markdown is an extension to the Markdown markup language that makes it easy to write HTML in a simple plain text format.  This allows us to both run the R/NIMBLE code directly as well as compile on-the-fly to an HTML file that can be used for presentation.
+
+Warning: in some cases the processing of the R code in the R Markdown is screwy and the slides have error messages that do not occur if you just run the code directly in R or RStudio. 
+
     
