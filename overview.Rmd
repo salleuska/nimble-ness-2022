@@ -1,0 +1,44 @@
+---
+title: "NIMBLE NESS 2022 short course"
+author: "Sally Paganin, Harvard T.H. Chan School of Public Health"
+date: '2022-05-20'
+output:
+  rmarkdown::html_document:
+    theme: lumen
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# A few administrative things
+
+## Where to find stuff
+
+The GitHub site ([https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022)) is the main repository for materials for the modules; you can also get the individual files from GitHub. 
+
+If you're not familiar with Git, you can get these materials by simply going to [https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022) and click on the 'Download ZIP' button in the right side of the window or simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip). See also slide 6 in this document for how to get them using Git or from within RStudio.
+
+
+# How we'll operate
+
+The workshop will be organized in modules, each of which will be a combination of lecture/demo presentation. 
+
+Here are the modules we'll work through for this short course.
+
+- Introduction to NIMBLE: basic concepts and workflows
+    - [1_introduction_to_nimble](content/1_introduction_to_nimble/introduction_to_nimble.html)
+    - [2_nimble_models](content/2_nimble_models/nimble_models.html)
+- Customizing an MCMC 
+    - [3_customizing_mcmc](content/3_customizing_mcmc/customizing_mcmc.html)
+
+- Programming in NIMBLE
+    - [4_writing_user_distributions](content/4_writing_user_distributions/writing_user_distributions.html)
+    - [5_writing_user_samplers](content//5_writing_user_samplers/writing_user_sampler.html)
+    - (extra)
+- Highlights of special features in NIMBLE
+    - [6_nimble_highlights](content/6_nimble_highlights/nimble_highlights.html)
+    
+    
+    
