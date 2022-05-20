@@ -18,7 +18,7 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 Monday, May 22, 2022 
 Location: AUST 108
 
-Click (here)[overview.html] for an overview of the material
+Click [here](overview.html) for an overview of the material
 
 Morning: 9am - 12pm 
 - Introduction to NIMBLE: basic concepts and workflows
