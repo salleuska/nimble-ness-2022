@@ -33,7 +33,7 @@ Here are the modules we'll work through for this short course.
     - [3_customizing_mcmc](content/3_customizing_mcmc/customizing_mcmc.html)
 
 - Programming in NIMBLE
-    - [4_writing_user_distributions](content/4_writing_user_dist/writing_user_distributions.html)
+    - [4_writing_user_distributions](content/4_writing_user_distributions/writing_user_dist.html)
     - [5_writing_user_samplers](content/5_writing_user_samplers/writing_user_sampler.html)
     - (extra module) [nimbleFunctions](content/extra_nimble_functions/basic_nimbleFunction.html)
 - Highlghts of special features in NIMBLE

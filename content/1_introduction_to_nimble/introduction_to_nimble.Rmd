@@ -179,7 +179,7 @@ knitr::include_graphics("img/litters_DAG.png")
 
 We can walk through some of details via the comments in the BUGS code. The model is a binomial GLMM with $G=2$ groups of rats litters, and exchangeable litter-specific survival probabilities for the litters in each group. 
 
-```{r, litters-code}
+```{r, litters-code, message=FALSE}
 library(nimble)
 littersCode <- nimbleCode({
   for (i in 1:G) {
