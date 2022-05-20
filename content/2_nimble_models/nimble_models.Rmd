@@ -574,13 +574,13 @@ Let's look at the two main ways this happens:
 ---
 
 ```{r, lifted-2, echo = FALSE, fig.cap="", fig.height=3.5, fig.width=3.5, dpi = 200}
-##par(mfrow = c(1,1))
 ##plot(m1$getGraph(),  vertex.shape = "crectangle", layout = layout_on_grid)
 
 gg <- m1$getGraph()
 V(gg)$label <- V(gg)$name
 layG <- layout_on_grid(gg)
 
+par(mfrow = c(1,1))
 plot(0, type="n", ann=FALSE, axes=FALSE, xlim=extendrange(layG[,1]), 
      ylim=extendrange(layG[,2]))
 
@@ -589,6 +589,9 @@ plot(gg, layout=layG, rescale=FALSE, add=TRUE,
      vertex.shape="rectangle",
      vertex.size=(strwidth(V(gg)$label) + strwidth("oo")) * 100,
      vertex.size2=strheight("I") * 2 * 100)
+
+
+
 
 ```
 
@@ -626,6 +629,7 @@ m1$getParam('x', 'sd')     ## Verifying the sd is not up to date.
 ```
 
 ---
+
 ### The importance of querying a model: model-generic programming
 
 Instead we need to ask NIMBLE for the dependencies of any nodes that have changed and use *model-generic* programming:
