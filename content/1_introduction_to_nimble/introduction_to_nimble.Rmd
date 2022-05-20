@@ -33,14 +33,14 @@ knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 60), tidy = TRUE)
 ### Acknowledgements
 
 .pull-left[
-![](perry.jpg)
+![](img/perry.jpg)
 
 Perry de Valpine
 (UC Berkeley)
 ]
 
 .pull-right[
-![](chris.jpg)
+![](img/chris.jpg)
 
 
 Chris Paciorek
@@ -54,11 +54,11 @@ Chris Paciorek
 **B**ayesian and **L**ikelihood **E**stimation.
 
 .pull-left[
-![](nimble-icon.png)
+![](img/nimble-icon.png)
 ]
 
 .pull-right[
-![](nimble-jackalope.png)
+![](img/nimble-jackalope.png)
 ]
 
 ---
@@ -140,12 +140,12 @@ We'll use the *litters* model example from BUGS. The data set describes survival
 
   - There are `G=2` groups of rat litters, with `N=16` litters (i.e., mothers) in each group, and a variable number of pups in each litter.
 
-  - We observe the number of rat pups who survived `r[i,j]` among `n[i,j]`
+  - We observe the number of survived rat pups `r[i,j]` among `n[i,j]`
   
   - Survival of the pups in a litter is governed by a survival probability for each litter, `p[i,j]`.
 
 ---
-## Specifying the code for a model
+### Specifying the code for a model
 
 Model for the data: the probabilities for the litters within a group are considered to come from a common distribution, thereby borrowing strength across the litters in a group.
 
@@ -170,7 +170,7 @@ Other quantities of interest:
 
 
 ```{r echo = FALSE, out.width="500px", fig.align='center'}
-knitr::include_graphics("litters_DAG.png")
+knitr::include_graphics("img/litters_DAG.png")
 
 ```
 
@@ -189,7 +189,7 @@ littersCode <- nimbleCode({
         # Latent process (random effects)
         p[i,j] ~ dbeta(a[i], b[i]) 
      }
-     # Priors for hyperparameters (not reccomended)
+     # Priors for hyperparameters (not ideal)
      a[i] ~ dgamma(1, .001)
      b[i] ~ dgamma(1, .001)
      ## Mean and dispersion reparameterization
@@ -224,7 +224,7 @@ littersInits <- list(a = c(2, 2), b = c(2, 2))
 
 ---
 
-.scroll-box-20[
+.scroll-box-24[
 ```{r, message = TRUE}
 ## create the NIMBLE model object
 littersModel <- nimbleModel(littersCode, 
@@ -250,7 +250,7 @@ Much of the power of NIMBLE comes from the ability to **customize algorithms**, 
 
 In order to talk about MCMC customization later today, we first need to see the 'manual' steps of running an MCMC in NIMBLE 
 
-[NIMBLE workflow](workflow.png):
+[NIMBLE workflow](img/workflow.png):
 
  1. configure the MCMC (via `configureMCMC()`)
  2. build the MCMC (via `buildMCMC()`)
@@ -327,7 +327,7 @@ samples <- runMCMC(cLittersMCMC, niter = niter,
 
 Now let's look at the MCMC performance from one of the chains.
 
-```{r output-mcmc, fig.height=6, fig.width=12, fig.cap='', fig.show="hide"}
+```{r output-mcmc, fig.height=6, fig.width=12, fig.cap='', dpi=300, fig.show="hide"}
 samples1 <- samples[[1]]
 
 par(mfrow = c(2, 2), mai = c(.6, .5, .4, .1), mgp = c(1.8, 0.7, 0))

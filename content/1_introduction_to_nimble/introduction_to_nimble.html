@@ -35,14 +35,14 @@ class: center, middle, inverse, title-slide
 ### Acknowledgements
 
 .pull-left[
-![](perry.jpg)
+![](img/perry.jpg)
 
 Perry de Valpine
 (UC Berkeley)
 ]
 
 .pull-right[
-![](chris.jpg)
+![](img/chris.jpg)
 
 
 Chris Paciorek
@@ -56,11 +56,11 @@ Chris Paciorek
 **B**ayesian and **L**ikelihood **E**stimation.
 
 .pull-left[
-![](nimble-icon.png)
+![](img/nimble-icon.png)
 ]
 
 .pull-right[
-![](nimble-jackalope.png)
+![](img/nimble-jackalope.png)
 ]
 
 ---
@@ -142,12 +142,12 @@ We'll use the *litters* model example from BUGS. The data set describes survival
 
   - There are `G=2` groups of rat litters, with `N=16` litters (i.e., mothers) in each group, and a variable number of pups in each litter.
 
-  - We observe the number of rat pups who survived `r[i,j]` among `n[i,j]`
+  - We observe the number of survived rat pups `r[i,j]` among `n[i,j]`
   
   - Survival of the pups in a litter is governed by a survival probability for each litter, `p[i,j]`.
 
 ---
-## Specifying the code for a model
+### Specifying the code for a model
 
 Model for the data: the probabilities for the litters within a group are considered to come from a common distribution, thereby borrowing strength across the litters in a group.
 
@@ -171,7 +171,7 @@ Other quantities of interest:
 ## Specifying the code for a model
 
 
-&lt;img src="litters_DAG.png" width="500px" style="display: block; margin: auto;" /&gt;
+&lt;img src="img/litters_DAG.png" width="500px" style="display: block; margin: auto;" /&gt;
 
 ---
 ## Specifying the code for a model
@@ -189,7 +189,7 @@ littersCode &lt;- nimbleCode({
             # Latent process (random effects)
             p[i, j] ~ dbeta(a[i], b[i])
         }
-        # Priors for hyperparameters
+        # Priors for hyperparameters (not ideal)
         a[i] ~ dgamma(1, 0.001)
         b[i] ~ dgamma(1, 0.001)
         ## Mean and dispersion reparameterization
@@ -224,7 +224,7 @@ littersInits &lt;- list(a = c(2, 2), b = c(2, 2))
 
 ---
 
-.scroll-box-20[
+.scroll-box-24[
 
 ```r
 ## create the NIMBLE model object
@@ -285,7 +285,7 @@ Much of the power of NIMBLE comes from the ability to **customize algorithms**, 
 
 In order to talk about MCMC customization later today, we first need to see the 'manual' steps of running an MCMC in NIMBLE 
 
-[NIMBLE workflow](workflow.png):
+[NIMBLE workflow](img/workflow.png):
 
  1. configure the MCMC (via `configureMCMC()`)
  2. build the MCMC (via `buildMCMC()`)

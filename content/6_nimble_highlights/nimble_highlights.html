@@ -1,28 +1,35 @@
----
-title: "Highlights of NIMBLE tools"
-subtitle: "NIMBLE NESS 2022 short course"
-author: "NIMBLE Development Team"
-date: "May 2022"
-# output:
-#   slidy_presentation: default
-#   beamer_presentation: default
-output:
-  xaringan::moon_reader:
-    css: [default, tamu-fonts, mystyle.css]
-    lib_dir: libs
-    nature:
-      highlightStyle: github
-      highlightSpans: true
-      highlightLines: true
-      countIncrementalSlides: false
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Highlights of NIMBLE tools</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="NIMBLE Development Team" />
+    <script src="libs/header-attrs-2.14/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/tamu-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="mystyle.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# Highlights of NIMBLE tools
+]
+.subtitle[
+## NIMBLE NESS 2022 short course
+]
+.author[
+### NIMBLE Development Team
+]
+.date[
+### May 2022
+]
+
 ---
 
-```{r chunksetup, include=FALSE} 
-# include any code here you don't want to show up in the document,
-# e.g. package and dataset loading
-library(methods)  # otherwise new() not being found - weird
-library(nimble)
-```
+
+
 
 ### Introduction
 
@@ -61,11 +68,12 @@ This module briefly covers highlights of various functionality in NIMBLE, namely
 
 BNP mixture models can be used to directly model data or to model random effects. Here's an example of some code for modeling random effects:
 
-```{r, eval=FALSE}
+
+```r
 for(i in 1:n) {
     gamma[i] ~ dnorm(mu[i], var = tau[i]) # mixture of normal densities
-    mu[i] <- muTilde[xi[i]]               # mean for component assigned to i'th study
-    tau[i] <- tauTilde[xi[i]]             # variance for component assigned to i'th study
+    mu[i] &lt;- muTilde[xi[i]]               # mean for component assigned to i'th study
+    tau[i] &lt;- tauTilde[xi[i]]             # variance for component assigned to i'th study
 }
 xi[1:nStudies] ~ dCRP(conc, size = n)     # cluster the gamma[i]'s into groups
 ```
@@ -114,15 +122,16 @@ RJ in NIMBLE turns off and on variables in regression-style models. This can be 
 
 Here are some code snippets for use without an indicator variable:
 
-```{r, eval=FALSE}
-code <- nimbleCode({
+
+```r
+code &lt;- nimbleCode({
    for(i in 1:n) 
       y[i] ~ dnorm(beta0 + beta1*x1[i] + beta2*x2[i], sd = sigma)
    ## other code omitted
 })
 
-model <- nimbleModel(code, data = data, constants = constants)
-conf <- configureMCMC(model)
+model &lt;- nimbleModel(code, data = data, constants = constants)
+conf &lt;- configureMCMC(model)
 configureRJ(conf,
             targetNodes = 'beta2',
             priorProb = 0.5,
@@ -140,11 +149,11 @@ DIC drawbacks:
  - DIC values are different for different parameterizations of the same model
  - DIC is based on the posterior mean so full posterior not used 
 
-WAIC tries to estimate the expected pointwise log predictive density for a new dataset, $\{\tilde{y}_i\}$:
+WAIC tries to estimate the expected pointwise log predictive density for a new dataset, `\(\{\tilde{y}_i\}\)`:
 
-\begin{equation}
+`\begin{equation}
   \sum_{i=1}^n E_{\tilde{y}}[\log p_{post}(\tilde{y}_i)]
-\end{equation}
+\end{equation}`
 
 
 ---
@@ -152,7 +161,7 @@ WAIC tries to estimate the expected pointwise log predictive density for a new d
 
 Two quantities are used:
   
-  1. Pointwise log predictive density in-sample: $\sum_{i=1}^n \log \left(\frac{1}{M} \sum_{j=1}^M p(y_i | \theta^{(j)}) \right)$
+  1. Pointwise log predictive density in-sample: `\(\sum_{i=1}^n \log \left(\frac{1}{M} \sum_{j=1}^M p(y_i | \theta^{(j)}) \right)\)`
   
   2. An estimate of the effective number of parameters (number of unconstrained parameters)
 
@@ -172,15 +181,16 @@ NIMBLE provides:
 
 Here's some syntax for the different WAIC variations:
 
-```{r, eval=FALSE}
+
+```r
 ## Conditional WAIC without data grouping:
-conf <- configureMCMC(Rmodel, enableWAIC = TRUE)
+conf &lt;- configureMCMC(Rmodel, enableWAIC = TRUE)
 
 ## Conditional WAIC with data grouping
-conf <- configureMCMC(Rmodel, enableWAIC = TRUE, controlWAIC = list(dataGroups = groups))
+conf &lt;- configureMCMC(Rmodel, enableWAIC = TRUE, controlWAIC = list(dataGroups = groups))
 
 ## Marginal WAIC (predict new 'mu' values) with data grouping:
-conf <- configureMCMC(Rmodel, enableWAIC = TRUE, controlWAIC =
+conf &lt;- configureMCMC(Rmodel, enableWAIC = TRUE, controlWAIC =
         list(dataGroups = groups, marginalizeNodes = 'mu'))
 ```
 
@@ -202,7 +212,8 @@ CAR models allow one to represent latent processes on a grid, often in space or 
 
 NIMBLE provides the improper CAR and proper CAR models using a joint specification :
 
-```{r, eval=FALSE}
+
+```r
 x[1:N] ~ dcar_normal(adjacencies, weights, number_locations, precision, c, zero_mean)
 x[1:N] ~ dcar_proper(mu, C, adj, num, M, tau, gamma)
 ```
@@ -231,29 +242,65 @@ The external code could be:
 
 ### Calling external code - example
 
-```{r}
-Rquantile <- nimbleRcall(function(x = double(1), probs = double(1)) {},
+
+```r
+Rquantile &lt;- nimbleRcall(function(x = double(1), probs = double(1)) {},
           returnType = double(1), Rfun = 'quantile')
 ## The 'Rfun' could you be your own R function too
 ```
 
-```{r, echo=FALSE}
-## only needed for generating html:
-assign('Rquantile', Rquantile, .GlobalEnv)
-```
+
 
 .scroll-box-16[
-```{r}
-demoCode <- nimbleCode({       
+
+```r
+demoCode &lt;- nimbleCode({       
    for(i in 1:n)
          x[i] ~ dnorm(0,1)
-   q[1:2] <- Rquantile(x[1:4], c(.025, .975))
+   q[1:2] &lt;- Rquantile(x[1:4], c(.025, .975))
 })
-n <- 100
-demoModel <- nimbleModel(demoCode, constants = list(n = n),
+n &lt;- 100
+demoModel &lt;- nimbleModel(demoCode, constants = list(n = n),
                          inits = list(x = rnorm(n)))
-CdemoModel <- compileNimble(demoModel)
+```
+
+```
+## Defining model
+```
+
+```
+## Building model
+```
+
+```
+## Setting data and initial values
+```
+
+```
+## Running calculate on model
+##   [Note] Any error reports that follow may simply reflect missing values in model variables.
+```
+
+```
+## Checking model sizes and dimensions
+```
+
+```r
+CdemoModel &lt;- compileNimble(demoModel)
+```
+
+```
+## Compiling
+##   [Note] This may take a minute.
+##   [Note] Use 'showCompilerOutput = TRUE' to see C++ compilation details.
+```
+
+```r
 CdemoModel$q
+```
+
+```
+## [1] -0.673504363  0.008172558
 ```
 ]
 
@@ -279,7 +326,7 @@ In addition you can use particle filters to integrate over latent states in an o
 ---
 class: middle, center
 
-![](https://media1.giphy.com/media/LpQrsRA3zOuJNk7KYt/giphy.gif?cid=790b7611dbf6c2c11c86830d82acbf80bbf309d54a0637bd&rid=giphy.gif&ct=g)
+![](https://media1.giphy.com/media/LpQrsRA3zOuJNk7KYt/giphy.gif?cid=790b7611dbf6c2c11c86830d82acbf80bbf309d54a0637bd&amp;rid=giphy.gif&amp;ct=g)
 ---
 
 ## Getting help with and contributing to NIMBLE
@@ -314,3 +361,140 @@ We try to be responsive on the the user support/discussion list, and welcome oth
 
 
  
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightSpans": true,
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
