@@ -18,7 +18,7 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 Monday, May 22, 2022 
 Location: AUST 108
 
-Click [here](https://rawcdn.githack.com/salleuska/nimble-ness-2022/877e3b556d4df8995e4c47dd30a54ebe1a4d07f2/overview.html) for an overview of the material
+Click [here](https://htmlpreview.github.io/?https://github.com/salleuska/nimble-ness-2022/blob/main/overview.html) for an overview of the material
 
 Morning: 9am - 12pm 
 - Introduction to NIMBLE: basic concepts and workflows
