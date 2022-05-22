@@ -320,11 +320,11 @@ m2 <- nimbleModel(
     ))
 ```
 
-`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` The two models are are not equivalent
+`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` The two models (in terms of internal representation) are not equivalent
 
 ---
 
-`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` The two models are are not equivalent
+`r icon_style(fontawesome("exclamation-circle"), fill = "darkred")` he two models (in terms of internal representation) are not equivalent
 
 
 ```{r, vectorized-3}
@@ -587,7 +587,7 @@ plot(0, type="n", ann=FALSE, axes=FALSE, xlim=extendrange(layG[,1]),
 
 plot(gg, layout=layG, rescale=FALSE, add=TRUE,
      vertex.shape="rectangle",
-     vertex.size=(strwidth(V(gg)$label) + strwidth("oo")) * 100,
+     vertex.size=(strwidth(V(gg)$label) + strwidth("ooo")) * 100,
      vertex.size2=strheight("I") * 2 * 100)
 
 

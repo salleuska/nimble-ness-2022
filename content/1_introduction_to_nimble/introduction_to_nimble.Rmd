@@ -95,7 +95,7 @@ Chris Paciorek
 ---
 # Why NIMBLE?
 
-Here are some of the features you can do in NIMBLE that we are most excited about and that distinguish NIMBLE from other software:
+Here are some of the features avaliable in NIMBLE that we are most excited about and that distinguish NIMBLE from other software:
 
 - customize your MCMCs, including choosing what parameters to block
 

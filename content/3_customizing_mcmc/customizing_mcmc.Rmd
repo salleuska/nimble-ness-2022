@@ -1,5 +1,5 @@
 ---
-title: "Customizing an MCMC`"
+title: "Customizing an MCMC"
 subtitle: "NIMBLE NESS 2022 short course"
 author: "NIMBLE Development Team"
 date: "May 2022"
