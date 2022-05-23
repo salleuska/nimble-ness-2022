@@ -9,9 +9,11 @@ To prepare for the workshop:
 
 All materials for the workshop will be in this GitHub repository. If you're familiar with Git/GitHub, you already know how to get all the materials on your computer. If you're not, simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip).
 
-<!--
- There is some overview information [here (https://htmlpreview.github.io/?https://github.com/nimble-training/nimble-lisbon-2022/blob/main/overview.html), including links to the content modules in order.
- -->
+## More resources (especially for new users)
+
+- Lighting introduction in the user manual [https://r-nimble.org/html_manual/cha-lightning-intro.html](https://r-nimble.org/html_manual/cha-lightning-intro.html)
+- Examples on nimble websites [https://r-nimble.org/examples](https://r-nimble.org/examples)
+- Other workshops materials [nimble-training](https://github.com/nimble-training)
 
 ## Tentative Schedule
 
