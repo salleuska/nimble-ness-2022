@@ -43,7 +43,11 @@ Instead, we can use **reflection**. If the proposed $\theta^\prime < b$ where $b
 
 ---
 
-<center><img src="reflection.jpg"></center>
+<center><img src="reflection_sampler.png"></center>
+
+---
+
+<center><img src="reflection_sampler2.png"></center>
 
 ---
 ### Writing a nimbleFunction for the reflection sampler

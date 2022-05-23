@@ -573,27 +573,8 @@ Let's look at the two main ways this happens:
 ```
 ---
 
-```{r, lifted-2, echo = FALSE, fig.cap="", fig.height=3.5, fig.width=3.5, dpi = 200}
-##plot(m1$getGraph(),  vertex.shape = "crectangle", layout = layout_on_grid)
+<center><img src="variables.png"></center>
 
-gg <- m1$getGraph()
-V(gg)$label <- V(gg)$name
-layG <- layout_on_grid(gg)
-
-par(mfrow = c(1,1))
-plot(0, type="n", ann=FALSE, axes=FALSE, xlim=extendrange(layG[,1]), 
-     ylim=extendrange(layG[,2]))
-
-
-plot(gg, layout=layG, rescale=FALSE, add=TRUE,
-     vertex.shape="rectangle",
-     vertex.size=(strwidth(V(gg)$label) + strwidth("ooo")) * 100,
-     vertex.size2=strheight("I") * 2 * 100)
-
-
-
-
-```
 
 
 ---
