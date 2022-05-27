@@ -13,14 +13,14 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 
 - Lighting introduction in the user manual [https://r-nimble.org/html_manual/cha-lightning-intro.html](https://r-nimble.org/html_manual/cha-lightning-intro.html)
 - Examples on nimble websites [https://r-nimble.org/examples](https://r-nimble.org/examples)
-- Other workshops materials [nimble-training](https://github.com/nimble-training)
+- Other workshops material [nimble-training](https://github.com/nimble-training)
 
 ## Tentative Schedule
 
 Monday, May 22, 2022 
 Location: AUST 108
 
-Click [here](https://rawcdn.githack.com/salleuska/nimble-ness-2022/867e7c8a8555436b7d2f4463a30fc2bf2dfcc8cf/overview.html) for an overview of the material
+Click [here](https://raw.githack.com/salleuska/nimble-ness-2022/main/overview.html) for an overview of the material
 
 Morning: 9am - 12pm 
 - Introduction to NIMBLE: basic concepts and workflows
