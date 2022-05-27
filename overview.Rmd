@@ -16,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 The GitHub site ([https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022)) is the main repository for materials for the modules; you can also get the individual files from GitHub. 
 
-If you're not familiar with Git, you can get these materials by simply going to [https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022) and click on the 'Download ZIP' button in the right side of the window or simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip). See also slide 6 in this document for how to get them using Git or from within RStudio.
+If you're not familiar with Git, you can get these materials by simply going to [https://github.com/salleuska/nimble-ness-2022](https://github.com/salleuska/nimble-ness-2022) and click on the 'Download ZIP' button in the right side of the window or simply click [here](https://github.com/salleuska/nimble-ness-2022/archive/main.zip).
 
 
 ## The short course

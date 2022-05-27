@@ -195,6 +195,7 @@ littersMargModel <- nimbleModel(littersMargCode,
           inits = littersInits)
 cLittersMargModel <- compileNimble(littersMargModel)
 littersMargConf <- configureMCMC(littersMargModel, print = TRUE)
+
 hypers <- c('a[1]', 'b[1]', 'a[2]', 'b[2]')
 
 for(h in hypers) {

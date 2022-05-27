@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="" xml:lang="">
   <head>
-    <title>Customizing an MCMC`</title>
+    <title>Customizing an MCMC</title>
     <meta charset="utf-8" />
     <meta name="author" content="NIMBLE Development Team" />
     <script src="libs/header-attrs-2.14/header-attrs.js"></script>
@@ -14,7 +14,7 @@
 class: center, middle, inverse, title-slide
 
 .title[
-# Customizing an MCMC`
+# Customizing an MCMC
 ]
 .subtitle[
 ## NIMBLE NESS 2022 short course
@@ -93,6 +93,7 @@ Let's try using slice samplers (these are used by default much more heavily in J
 
 ```r
 hypers &lt;- c("a[1]", "b[1]", "a[2]", "b[2]")
+
 for (h in hypers) {
     littersConf$removeSamplers(h)
     littersConf$addSampler(target = h, type = "slice")
@@ -454,7 +455,9 @@ m_light$getDependencies("x[1]")
 ## [1] "y[1]" "x[2]"
 ```
 ]
+
 `eps[1]` affects all the `x[t]` values and therefore all the `y[t]` values! 
+
 ---
 ### Think like a graph: when to vectorize
 

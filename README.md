@@ -40,9 +40,9 @@ Afternoon: 1pm - 5pm
 
 Our user manual is [here](https://r-nimble.org/html_manual/cha-welcome-nimble.html).
 
-We have a 'cheatsheet' [here](https://r-nimble.org/documentation).
+We have a cheatsheet on nimble models and distributions [here](https://r-nimble.org/documentation).
 
-For those of you who are not already familiar with writing models in WinBUGS, JAGS, or NIMBLE, you may want to look through the first module (Introduction to NIMBLE) or Section 5.2 of our user manual in advance.
+For those of you who are not already familiar with writing models in WinBUGS, JAGS, or NIMBLE, you may want to look at Section 5.2 of our user manual in advance.
 
 
 ## Installing NIMBLE
@@ -66,7 +66,7 @@ model <- nimbleModel(code)
 cModel <- compileNimble(model)
 ```
 
-If that runs without error, you're all set. If not, please see the [troubleshooting tips](https://r-nimble.org/html_manual/cha-installing-nimble.html#troubleshooting-installation-problems) and email me at spaganin@hsph.harvard.edu directly if you can't get things going.  
+If that runs without error, you're all set. If not, please see the [troubleshooting tips](https://r-nimble.org/html_manual/cha-installing-nimble.html#troubleshooting-installation-problems) and email me in case you can't get things going.  
 
 In general we encourage you to update to the most recent version of NIMBLE, 0.12.2.
 
@@ -78,9 +78,6 @@ Some of the packages we will use (beyond those automatically installed with `nim
 ```
 install.packages(c("mcmcplots",  "classInt", "coda"))
 ```
-<!--
-"CARBayesdata", "sp", "spdep",
---->
 
 `compareMCMCs` is a package in development that is not yet on CRAN:
 

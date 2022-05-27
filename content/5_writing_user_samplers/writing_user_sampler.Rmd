@@ -58,9 +58,13 @@ However, we first need to modify the *setup* function to check if the distributi
 
 .scroll-box-16[
 ```{r, reflect-sampler}
+
+target = "tau"
+
 RW_reflect <- nimbleFunction(
     contains = sampler_BASE,
     setup = function(model, mvSaved, target, control) {
+        
         ## Some checking...
         targetComponents <- model$expandNodeNames(target, returnScalarComponents = TRUE)
         if(length(targetComponents) > 1)
@@ -74,7 +78,6 @@ RW_reflect <- nimbleFunction(
 
         calcNodes  <- model$getDependencies(target)
     },
-    
     run = function() {
         propValue <- rnorm(1, mean = model[[target]], sd = scale)
 
@@ -84,7 +87,7 @@ RW_reflect <- nimbleFunction(
             if(propValue < lower) propValue <- 2*lower - propValue
             if(propValue > upper) propValue <- 2*upper - propValue
         }
- 
+
         model[[target]] <<- propValue
         ## Calculate difference of log posterior relative to previous value (which has been saved).
         logMHR <- calculateDiff(model, calcNodes) 
@@ -102,6 +105,8 @@ RW_reflect <- nimbleFunction(
 )
 ```
 ]
+
+
 ---
 
 # NIMBLE's Metropolis sampler
@@ -183,7 +188,6 @@ RW_reflect <- nimbleFunction(
     },
     
     methods = list(
-        
         adaptiveProcedure = function(jump = logical()) {
             timesRan <<- timesRan + 1
             if(jump)     timesAccepted <<- timesAccepted + 1
@@ -229,6 +233,7 @@ Let's try this with a simulated example where the true value of a variance compo
 
 
 ```{r, simulate}
+
 set.seed(1)
 m  <- nsub <- 10
 id <- rep(1:m, each = nsub)
@@ -240,6 +245,7 @@ b1 <- 3
 y <- b0 + b1*x + rnorm(n)
 y <- matrix(y, nrow = m)
 x <- matrix(x, nrow = m)
+
 ```
 
 ---
@@ -255,6 +261,7 @@ code  <- nimbleCode({
         }
         b0[j] ~ dnorm(mu, sd = tau)
     }
+    
     sigma ~ dunif(0, 20) 
     tau ~ dunif(0, 20)
     b1 ~ dflat()
@@ -272,6 +279,7 @@ smp1  <- runMCMC(cMCMC)
 par(mfrow = c(1,2))
 ts.plot(smp1[ , 'tau'], ylab = 'tau', xlab = 'iteration')
 ts.plot(smp1[ , 'mu'], ylab = 'mu', xlab = 'iteration')
+
 ```
 
 ---
@@ -279,6 +287,7 @@ ts.plot(smp1[ , 'mu'], ylab = 'mu', xlab = 'iteration')
 # not clear why RW_reflect() not being put into global
 # if this isn't done, configureMCMC fails to find sampler_RW_reflect in knitr
 assign('RW_reflect', RW_reflect, .GlobalEnv)
+
 ```
 
 ### Using the new sampler: modifying the MCMC configuration
@@ -295,6 +304,7 @@ MCMC2 <- buildMCMC(conf)
 cMCMC2 <- compileNimble(MCMC2, resetFunctions = TRUE)
 
 nimCopy(model, cModel)  # initialize 2nd MCMC same as 1st MCMC
+
 smp2 <- runMCMC(cMCMC2)
 ```
 ---

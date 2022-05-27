@@ -39,7 +39,9 @@ One of NIMBLE's most important features is that users can easily modify the MCMC
 
 .scroll-box-16[
 ```{r default-config}
+
 littersConf$printSamplers()
+
 ```
 ]
 ---
@@ -51,6 +53,7 @@ Let's try using slice samplers (these are used by default much more heavily in J
 .scroll-box-10[
 ```{r customize-mcmc}
 hypers <- c('a[1]', 'b[1]', 'a[2]', 'b[2]')
+
 for(h in hypers) {
       littersConf$removeSamplers(h)
       littersConf$addSampler(target = h, type = 'slice')
@@ -76,6 +79,8 @@ nburn <- 1000
 set.seed(1)
 samplesSlice <- runMCMC(cLittersMCMC, niter = niter, nburnin = nburn,
              inits = littersInits, nchains = 1, samplesAsCodaMCMC = TRUE)
+
+
 ```
 
 ---
@@ -240,14 +245,18 @@ What calculations are required to update `eps[18]` or `eps[1]` compared to `x[18
 
 .scroll-box-14[
 ```{r}
+
 m_heavy$getDependencies('eps[18]')
 m_light$getDependencies('x[18]')
 
 m_heavy$getDependencies('eps[1]')
 m_light$getDependencies('x[1]')
+
 ```
 ]
+
 `eps[1]` affects all the `x[t]` values and therefore all the `y[t]` values! 
+
 ---
 ### Think like a graph: when to vectorize
 

@@ -53,7 +53,6 @@ Instead, we can use **reflection**. If the proposed `\(\theta^\prime &lt; b\)` w
 
 ---
 
-
 &lt;center&gt;&lt;img src="reflection_sampler.png"&gt;&lt;/center&gt;
 
 ---
@@ -70,9 +69,12 @@ However, we first need to modify the *setup* function to check if the distributi
 .scroll-box-16[
 
 ```r
+target = "tau"
+
 RW_reflect &lt;- nimbleFunction(
     contains = sampler_BASE,
     setup = function(model, mvSaved, target, control) {
+        
         ## Some checking...
         targetComponents &lt;- model$expandNodeNames(target, returnScalarComponents = TRUE)
         if(length(targetComponents) &gt; 1)
@@ -86,7 +88,6 @@ RW_reflect &lt;- nimbleFunction(
 
         calcNodes  &lt;- model$getDependencies(target)
     },
-    
     run = function() {
         propValue &lt;- rnorm(1, mean = model[[target]], sd = scale)
 
@@ -96,7 +97,7 @@ RW_reflect &lt;- nimbleFunction(
             if(propValue &lt; lower) propValue &lt;- 2*lower - propValue
             if(propValue &gt; upper) propValue &lt;- 2*upper - propValue
         }
- 
+
         model[[target]] &lt;&lt;- propValue
         ## Calculate difference of log posterior relative to previous value (which has been saved).
         logMHR &lt;- calculateDiff(model, calcNodes) 
@@ -114,6 +115,8 @@ RW_reflect &lt;- nimbleFunction(
 )
 ```
 ]
+
+
 ---
 
 # NIMBLE's Metropolis sampler
@@ -196,7 +199,6 @@ RW_reflect &lt;- nimbleFunction(
     },
     
     methods = list(
-        
         adaptiveProcedure = function(jump = logical()) {
             timesRan &lt;&lt;- timesRan + 1
             if(jump)     timesAccepted &lt;&lt;- timesAccepted + 1
@@ -268,6 +270,7 @@ code  &lt;- nimbleCode({
         }
         b0[j] ~ dnorm(mu, sd = tau)
     }
+    
     sigma ~ dunif(0, 20) 
     tau ~ dunif(0, 20)
     b1 ~ dflat()
@@ -339,6 +342,7 @@ cMCMC2 &lt;- compileNimble(MCMC2, resetFunctions = TRUE)
 
 ```r
 nimCopy(model, cModel)  # initialize 2nd MCMC same as 1st MCMC
+
 smp2 &lt;- runMCMC(cMCMC2)
 ```
 
