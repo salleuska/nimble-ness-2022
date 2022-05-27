@@ -129,6 +129,10 @@ configureRJ(conf,
             control = list(mean = 0, scale = 1))
 ```
 
+- More in [Section 7.9 of the user manual](https://r-nimble.org/html_manual/cha-mcmc.html#sec:rjmcmc)
+- Blog post on nimble website: 
+[https://r-nimble.org/variable-selection-in-nimble-using-reversible-jump-mcmc](https://r-nimble.org/variable-selection-in-nimble-using-reversible-jump-mcmc)
+
 ---
 ## WAIC
 
