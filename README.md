@@ -13,7 +13,7 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 
 - Lighting introduction in the user manual [https://r-nimble.org/html_manual/cha-lightning-intro.html](https://r-nimble.org/html_manual/cha-lightning-intro.html)
 - Examples on nimble websites [https://r-nimble.org/examples](https://r-nimble.org/examples)
-- Other workshops materials [nimble-training](https://github.com/nimble-training)
+- Other workshops material [nimble-training](https://github.com/nimble-training)
 
 ## Tentative Schedule
 
