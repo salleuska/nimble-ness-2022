@@ -15,6 +15,9 @@ All materials for the workshop will be in this GitHub repository. If you're fami
 - Examples on nimble websites [https://r-nimble.org/examples](https://r-nimble.org/examples)
 - Other workshops material [nimble-training](https://github.com/nimble-training)
 
+## Credits
+The material for this workshop is based on othe workshops material available at [nimble-training](https://github.com/nimble-training) by the Nimble Development Team 
+
 ## Tentative Schedule
 
 Monday, May 22, 2022 
